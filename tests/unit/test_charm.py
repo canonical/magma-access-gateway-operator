@@ -26,7 +26,9 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
         patch_subprocess_run.assert_has_calls(
             [
-                call(["snap", "install", "magma-access-gateway", "--classic"], stdout=-1),
+                call(
+                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                ),
                 call(["magma-access-gateway.install"], stdout=-1),
             ]
         )
