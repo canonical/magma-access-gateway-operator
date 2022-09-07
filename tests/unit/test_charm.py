@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from ops import testing
-from ops.model import ActiveStatus, BlockedStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
 from charm import MagmaAccessGatewayOperatorCharm
 
@@ -341,7 +341,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         )
         self.assertEqual(
             self.harness.charm.unit.status,
-            ActiveStatus(),
+            MaintenanceStatus("Installing AGW"),
         )
 
     @patch("subprocess.run")
@@ -364,6 +364,18 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 "sgi-ipv6-gateway": "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
             }
         )
+        self.harness.update_config(
+            {
+                "s1-ipv4-address": "10.1.0.2/24",
+                "s1-ipv4-gateway": "10.1.0.1",
+            }
+        )
+        self.harness.update_config(
+            {
+                "s1-ipv6-address": "2002:0db8:85a3:0000:0000:8a2e:0370:7334/64",
+                "s1-ipv6-gateway": "2002:0db8:85a3:0000:0000:8a2e:0370:7331",
+            }
+        )
         self.harness.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
@@ -372,7 +384,78 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
                 ),
                 call(
-                    ["magma-access-gateway.install", "--sgi", "enp0s1", "--s1", "enp0s2"],
+                    [
+                        "magma-access-gateway.install",
+                        "--sgi",
+                        "enp0s1",
+                        "--s1",
+                        "enp0s2",
+                        "--sgi-ipv4-address",
+                        "10.0.0.2/24",
+                        "--sgi-ipv4-gateway",
+                        "10.0.0.1",
+                        "--sgi-ipv6-address",
+                        "2001:0db8:85a3:0000:0000:8a2e:0370:7334/64",
+                        "--sgi-ipv6-gateway",
+                        "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
+                        "--s1-ipv4-address",
+                        "10.1.0.2/24",
+                        "--s1-ipv4-gateway",
+                        "10.1.0.1",
+                        "--s1-ipv6-address",
+                        "2002:0db8:85a3:0000:0000:8a2e:0370:7334/64",
+                        "--s1-ipv6-gateway",
+                        "2002:0db8:85a3:0000:0000:8a2e:0370:7331",
+                    ],
+                    stdout=-1,
+                ),
+            ]
+        )
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            MaintenanceStatus("Installing AGW"),
+        )
+
+    @patch("subprocess.run")
+    @patch("netifaces.interfaces")
+    def test_given_magma_service_not_running_when_start_then_status_is_unchanged(
+        self, patch_interfaces, patch_subprocess_run
+    ):
+        event = Mock()
+        expected_status = self.harness.charm.unit.status
+        completed_process = Mock(returncode=1)
+        patch_subprocess_run.return_value = completed_process
+
+        self.harness.charm._on_start(event=event)
+
+        patch_subprocess_run.assert_has_calls(
+            [
+                call(
+                    ["systemctl", "is-active", "magma@magmad"],
+                    stdout=-1,
+                ),
+            ]
+        )
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            expected_status,
+        )
+
+    @patch("subprocess.run")
+    @patch("netifaces.interfaces")
+    def test_given_magma_service_running_when_start_then_status_is_active(
+        self, patch_interfaces, patch_subprocess_run
+    ):
+        event = Mock()
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+
+        self.harness.charm._on_start(event=event)
+
+        patch_subprocess_run.assert_has_calls(
+            [
+                call(
+                    ["systemctl", "is-active", "magma@magmad"],
                     stdout=-1,
                 ),
             ]

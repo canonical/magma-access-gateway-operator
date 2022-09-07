@@ -10,7 +10,7 @@ import subprocess
 from typing import List
 
 import netifaces  # type: ignore[import]
-from ops.charm import CharmBase, InstallEvent
+from ops.charm import CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -24,6 +24,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """Observes juju events."""
         super().__init__(*args)
         self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.start, self._on_start)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -42,6 +43,23 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
         self.install_magma_access_gateway()
+
+    def _on_start(self, event: StartEvent):
+        """Truggered on start event.
+
+        Args:
+            event: Juju event
+
+        Returns:
+            None
+        """
+        magma_service = subprocess.run(
+            ["systemctl", "is-active", "magma@magmad"],
+            stdout=subprocess.PIPE,
+        )
+        if magma_service.returncode != 0:
+            event.defer()
+            return
         self.unit.status = ActiveStatus()
 
     @staticmethod
@@ -195,6 +213,42 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             List of arguments for install command
         """
         arguments = ["--sgi", self.model.config["sgi"], "--s1", self.model.config["s1"]]
+        if self.model.config.get("sgi-ipv4-address"):
+            arguments.extend(
+                [
+                    "--sgi-ipv4-address",
+                    self.model.config["sgi-ipv4-address"],
+                    "--sgi-ipv4-gateway",
+                    self.model.config["sgi-ipv4-gateway"],
+                ]
+            )
+        if self.model.config.get("sgi-ipv6-address"):
+            arguments.extend(
+                [
+                    "--sgi-ipv6-address",
+                    self.model.config["sgi-ipv6-address"],
+                    "--sgi-ipv6-gateway",
+                    self.model.config["sgi-ipv6-gateway"],
+                ]
+            )
+        if self.model.config.get("s1-ipv4-address"):
+            arguments.extend(
+                [
+                    "--s1-ipv4-address",
+                    self.model.config["s1-ipv4-address"],
+                    "--s1-ipv4-gateway",
+                    self.model.config["s1-ipv4-gateway"],
+                ]
+            )
+        if self.model.config.get("s1-ipv6-address"):
+            arguments.extend(
+                [
+                    "--s1-ipv6-address",
+                    self.model.config["s1-ipv6-address"],
+                    "--s1-ipv6-gateway",
+                    self.model.config["s1-ipv6-gateway"],
+                ]
+            )
         return arguments
 
 
