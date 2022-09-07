@@ -5,6 +5,7 @@
 """Machine Charm for Magma's Access Gateway."""
 
 import ipaddress
+import json
 import logging
 import subprocess
 from typing import List
@@ -111,10 +112,15 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
 
     def _is_configuration_valid(self) -> bool:
         """Validates configuration."""
+        if self.model.config["skip-networking"]:
+            return True
         valid = self._is_valid_interface("sgi", "eth0")
         if not self._is_valid_interface("s1", "eth1"):
             valid = False
         if not self._is_valid_interface_addressing_configuration("sgi"):
+            valid = False
+        if not self._are_valid_dns(self.model.config["dns"]):
+            logger.warning("Invalid DNS configuration")
             valid = False
         return valid
 
@@ -205,6 +211,20 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         except ValueError:
             return False
 
+    def _are_valid_dns(self, dns: str) -> bool:
+        """Validate that provided string is a list of IP addresses."""
+        try:
+            list_of_dns = json.loads(dns)
+            if not isinstance(list_of_dns, list):
+                return False
+            try:
+                [ipaddress.ip_address(dns) for dns in list_of_dns]
+            except ValueError:
+                return False
+        except json.JSONDecodeError:
+            return False
+        return True
+
     @property
     def _install_arguments(self) -> List[str]:
         """Prepares argument list for install command from configuration.
@@ -212,7 +232,11 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             List of arguments for install command
         """
-        arguments = ["--sgi", self.model.config["sgi"], "--s1", self.model.config["s1"]]
+        if self.model.config["skip-networking"]:
+            return ["--skip-networking"]
+        arguments = ["--dns"]
+        arguments.extend(json.loads(self.model.config["dns"]))
+        arguments.extend(["--sgi", self.model.config["sgi"], "--s1", self.model.config["s1"]])
         if self.model.config.get("sgi-ipv4-address"):
             arguments.extend(
                 [
