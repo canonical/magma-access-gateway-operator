@@ -46,7 +46,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.install_magma_access_gateway()
 
     def _on_start(self, event: StartEvent):
-        """Truggered on start event.
+        """Triggered on start event.
 
         Args:
             event: Juju event
