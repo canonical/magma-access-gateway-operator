@@ -4,6 +4,7 @@
 
 """Machine Charm for Magma's Access Gateway."""
 
+import copy
 import ipaddress
 import json
 import logging
@@ -119,13 +120,28 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             valid = False
         if not self._is_valid_interface_addressing_configuration("sgi"):
             valid = False
+        if not self._is_valid_interface_addressing_configuration("s1"):
+            valid = False
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
             valid = False
         return valid
 
     def _is_valid_interface(self, interface_name: str, new_interface_name: str) -> bool:
-        """Validates a network interface name."""
+        """Validates a network interface name.
+
+        An interface name is required and must represent an interface present on the
+        machine. Because Magma requires interfaces to be named a certain way, the
+        installation will rename the interfaces. For that reason, we also check for
+        the renamed interface to be present.
+
+        Args:
+            interface_name: Original name of the interface
+            new_interface_name: Name of the interface that will be set by Magma
+
+        Returns:
+            True if the interface name is valid and found
+        """
         interface = self.model.config.get(interface_name)
         if not interface:
             logger.warning("%s interface name is required", (interface_name))
@@ -171,7 +187,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return False
         return True
 
-    def _is_valid_ipv4_address(self, ipv4_address: str) -> bool:
+    @staticmethod
+    def _is_valid_ipv4_address(ipv4_address: str) -> bool:
         """Validate an IPv4 address and netmask.
 
         A valid string will have the form:
@@ -179,11 +196,12 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """
         try:
             ip = ipaddress.ip_network(ipv4_address, strict=False)
-            return isinstance(ip, ipaddress.IPv4Network)
+            return isinstance(ip, ipaddress.IPv4Network) and ip.prefixlen != 32
         except ValueError:
             return False
 
-    def _is_valid_ipv4_gateway(self, ipv4_gateway: str) -> bool:
+    @staticmethod
+    def _is_valid_ipv4_gateway(ipv4_gateway: str) -> bool:
         """Validate an IPv4 gateway.
 
         A valid string will have the form:
@@ -195,23 +213,35 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         except ValueError:
             return False
 
-    def _is_valid_ipv6_address(self, ipv6_address: str) -> bool:
-        """Validate an IPv6 address and netmask."""
+    @staticmethod
+    def _is_valid_ipv6_address(ipv6_address: str) -> bool:
+        """Validate an IPv6 address and netmask.
+
+        A valid string will contain an IPv6 address followed by a
+        netmask, like this:
+        2001:0db8:85a3:0000:0000:8a2e:0370:7334/64
+        """
         try:
             ip = ipaddress.ip_network(ipv6_address, strict=False)
-            return isinstance(ip, ipaddress.IPv6Network)
+            return isinstance(ip, ipaddress.IPv6Network) and ip.prefixlen != 128
         except ValueError:
             return False
 
-    def _is_valid_ipv6_gateway(self, ipv6_gateway: str) -> bool:
-        """Validate an IPv6 gateway."""
+    @staticmethod
+    def _is_valid_ipv6_gateway(ipv6_gateway: str) -> bool:
+        """Validate an IPv6 gateway.
+
+        A valid string will contain an IPv6 address, like this:
+        2001:0db8:85a3:0000:0000:8a2e:0370:7334
+        """
         try:
             ip = ipaddress.ip_address(ipv6_gateway)
             return isinstance(ip, ipaddress.IPv6Address)
         except ValueError:
             return False
 
-    def _are_valid_dns(self, dns: str) -> bool:
+    @staticmethod
+    def _are_valid_dns(dns: str) -> bool:
         """Validate that provided string is a list of IP addresses."""
         try:
             list_of_dns = json.loads(dns)
@@ -232,47 +262,13 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             List of arguments for install command
         """
-        if self.model.config["skip-networking"]:
+        config = dict(copy.deepcopy(self.model.config))
+        if config.pop("skip-networking"):
             return ["--skip-networking"]
         arguments = ["--dns"]
-        arguments.extend(json.loads(self.model.config["dns"]))
-        arguments.extend(["--sgi", self.model.config["sgi"], "--s1", self.model.config["s1"]])
-        if self.model.config.get("sgi-ipv4-address"):
-            arguments.extend(
-                [
-                    "--sgi-ipv4-address",
-                    self.model.config["sgi-ipv4-address"],
-                    "--sgi-ipv4-gateway",
-                    self.model.config["sgi-ipv4-gateway"],
-                ]
-            )
-        if self.model.config.get("sgi-ipv6-address"):
-            arguments.extend(
-                [
-                    "--sgi-ipv6-address",
-                    self.model.config["sgi-ipv6-address"],
-                    "--sgi-ipv6-gateway",
-                    self.model.config["sgi-ipv6-gateway"],
-                ]
-            )
-        if self.model.config.get("s1-ipv4-address"):
-            arguments.extend(
-                [
-                    "--s1-ipv4-address",
-                    self.model.config["s1-ipv4-address"],
-                    "--s1-ipv4-gateway",
-                    self.model.config["s1-ipv4-gateway"],
-                ]
-            )
-        if self.model.config.get("s1-ipv6-address"):
-            arguments.extend(
-                [
-                    "--s1-ipv6-address",
-                    self.model.config["s1-ipv6-address"],
-                    "--s1-ipv6-gateway",
-                    self.model.config["s1-ipv6-gateway"],
-                ]
-            )
+        arguments.extend(json.loads(config.pop("dns")))
+        for key, value in config.items():
+            arguments.extend([f"--{key}", value])
         return arguments
 
 
