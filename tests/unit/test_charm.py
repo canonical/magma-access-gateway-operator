@@ -406,114 +406,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_s1_ipv4_address_and_no_gateway_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv4-address": "10.0.0.2/24",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Both IPv4 address and gateway required for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
-    def test_given_s1_ipv4_gateway_and_no_address_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv4-gateway": "10.0.0.1",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Both IPv4 address and gateway required for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
-    def test_given_s1_ipv6_address_and_no_gateway_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv6-address": "2001:0db8:85a3:0000:0000:8a2e:0370:7334/64",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Both IPv6 address and gateway required for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
-    def test_given_s1_ipv6_gateway_and_no_address_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv6-gateway": "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Both IPv6 address and gateway required for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
     def test_given_only_ipv6_s1_config_when_install_then_status_is_blocked(
         self,
         patch_interfaces,
@@ -525,7 +417,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "s1-ipv6-address": "2001:0db8:85a3:0000:0000:8a2e:0370:7334/64",
-                "s1-ipv6-gateway": "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
             }
         )
         with self.assertLogs() as captured:
@@ -553,7 +444,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "s1-ipv4-address": "invalidip",
-                "s1-ipv4-gateway": "10.0.0.1",
             }
         )
         with self.assertLogs() as captured:
@@ -570,34 +460,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_invalid_s1_ipv4_gateway_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv4-address": "10.0.0.2/24",
-                "s1-ipv4-gateway": "not a gateway",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Invalid IPv4 gateway for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
     def test_given_invalid_s1_ipv6_address_config_when_install_then_status_is_blocked(
         self,
         patch_interfaces,
@@ -609,13 +471,11 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "s1-ipv4-address": "10.0.0.2/24",
-                "s1-ipv4-gateway": "10.0.0.1",
             }
         )
         self.harness.update_config(
             {
                 "s1-ipv6-address": "not ipv6",
-                "s1-ipv6-gateway": "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
             }
         )
         with self.assertLogs() as captured:
@@ -627,40 +487,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         )
         self.assertEqual(
             "Invalid IPv6 address and netmask for interface s1",
-            captured.records[0].getMessage(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
-    def test_given_invalid_s1_ipv6_gateway_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.update_config(
-            {
-                "s1-ipv4-address": "10.0.0.2/24",
-                "s1-ipv4-gateway": "10.0.0.1",
-            }
-        )
-        self.harness.update_config(
-            {
-                "s1-ipv6-address": "2001:0db8:85a3:0000:0000:8a2e:0370:7334/64",
-                "s1-ipv6-gateway": "not a gateway",
-            }
-        )
-        with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
-        )
-        self.assertEqual(
-            "Invalid IPv6 gateway for interface s1",
             captured.records[0].getMessage(),
         )
 
@@ -803,13 +629,11 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness.update_config(
             {
                 "s1-ipv4-address": "10.1.0.2/24",
-                "s1-ipv4-gateway": "10.1.0.1",
             }
         )
         self.harness.update_config(
             {
                 "s1-ipv6-address": "2002:0db8:85a3:0000:0000:8a2e:0370:7334/64",
-                "s1-ipv6-gateway": "2002:0db8:85a3:0000:0000:8a2e:0370:7331",
             }
         )
         self.harness.charm._on_install(event=event)
@@ -839,12 +663,8 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                         "2001:0db8:85a3:0000:0000:8a2e:0370:7331",
                         "--s1-ipv4-address",
                         "10.1.0.2/24",
-                        "--s1-ipv4-gateway",
-                        "10.1.0.1",
                         "--s1-ipv6-address",
                         "2002:0db8:85a3:0000:0000:8a2e:0370:7334/64",
-                        "--s1-ipv6-gateway",
-                        "2002:0db8:85a3:0000:0000:8a2e:0370:7331",
                     ],
                     stdout=-1,
                 ),

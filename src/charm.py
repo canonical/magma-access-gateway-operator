@@ -118,9 +118,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         valid = self._is_valid_interface("sgi", "eth0")
         if not self._is_valid_interface("s1", "eth1"):
             valid = False
-        if not self._is_valid_interface_addressing_configuration("sgi"):
+        if not self._is_valid_sgi_interface_addressing_configuration():
             valid = False
-        if not self._is_valid_interface_addressing_configuration("s1"):
+        if not self._is_valid_s1_interface_addressing_configuration():
             valid = False
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
@@ -154,36 +154,51 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return False
         return True
 
-    def _is_valid_interface_addressing_configuration(self, interface: str) -> bool:
+    def _is_valid_sgi_interface_addressing_configuration(self) -> bool:
         """Validates sgi interface configuration."""
-        ipv4_address = self.model.config.get(f"{interface}-ipv4-address")
-        ipv4_gateway = self.model.config.get(f"{interface}-ipv4-gateway")
-        ipv6_address = self.model.config.get(f"{interface}-ipv6-address")
-        ipv6_gateway = self.model.config.get(f"{interface}-ipv6-gateway")
+        ipv4_address = self.model.config.get("sgi-ipv4-address")
+        ipv4_gateway = self.model.config.get("sgi-ipv4-gateway")
+        ipv6_address = self.model.config.get("sgi-ipv6-address")
+        ipv6_gateway = self.model.config.get("sgi-ipv6-gateway")
         if not ipv4_address and not ipv4_gateway and not ipv6_address and not ipv6_gateway:
             return True
         if any([ipv4_address, ipv4_gateway]) and not all([ipv4_address, ipv4_gateway]):
-            logger.warning("Both IPv4 address and gateway required for interface %s", (interface))
+            logger.warning("Both IPv4 address and gateway required for interface sgi")
             return False
         if any([ipv6_address, ipv6_gateway]) and not all([ipv6_address, ipv6_gateway]):
-            logger.warning("Both IPv6 address and gateway required for interface %s", (interface))
+            logger.warning("Both IPv6 address and gateway required for interface sgi")
             return False
         if ipv6_address and not ipv4_address:
-            logger.warning(
-                "Pure IPv6 configuration is not supported for interface %s", (interface)
-            )
+            logger.warning("Pure IPv6 configuration is not supported for interface sgi")
             return False
         if ipv4_address and not self._is_valid_ipv4_address(ipv4_address):
-            logger.warning("Invalid IPv4 address and netmask for interface %s", (interface))
+            logger.warning("Invalid IPv4 address and netmask for interface sgi")
             return False
         if ipv4_gateway and not self._is_valid_ipv4_gateway(ipv4_gateway):
-            logger.warning("Invalid IPv4 gateway for interface %s", (interface))
+            logger.warning("Invalid IPv4 gateway for interface sgi")
             return False
         if ipv6_address and not self._is_valid_ipv6_address(ipv6_address):
-            logger.warning("Invalid IPv6 address and netmask for interface %s", (interface))
+            logger.warning("Invalid IPv6 address and netmask for interface sgi")
             return False
         if ipv6_gateway and not self._is_valid_ipv6_gateway(ipv6_gateway):
-            logger.warning("Invalid IPv6 gateway for interface %s", (interface))
+            logger.warning("Invalid IPv6 gateway for interface sgi")
+            return False
+        return True
+
+    def _is_valid_s1_interface_addressing_configuration(self) -> bool:
+        """Validates s1 interface configuration."""
+        ipv4_address = self.model.config.get("s1-ipv4-address")
+        ipv6_address = self.model.config.get("s1-ipv6-address")
+        if not ipv4_address and not ipv6_address:
+            return True
+        if ipv6_address and not ipv4_address:
+            logger.warning("Pure IPv6 configuration is not supported for interface s1")
+            return False
+        if ipv4_address and not self._is_valid_ipv4_address(ipv4_address):
+            logger.warning("Invalid IPv4 address and netmask for interface s1")
+            return False
+        if ipv6_address and not self._is_valid_ipv6_address(ipv6_address):
+            logger.warning("Invalid IPv6 address and netmask for interface s1")
             return False
         return True
 

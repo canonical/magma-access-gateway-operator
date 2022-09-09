@@ -23,14 +23,8 @@ options:
     description: "IPv4 address and netmask (ex: 127.0.0.1/32) of the s1
                   interface (if not specified, DHCP will be used)"
     type: string
-  s1-ipv4-gateway:
-    description: IPv4 gateway address for the s1 interface
-    type: string
   s1-ipv6-address:
     description: "IPv6 address and netmask (ex: ::1/128) of the s1 interface"
-    type: string
-  s1-ipv6-gateway:
-    description: IPv6 gateway address for the s1 interface
     type: string
   skip-networking:
     description: If true, the installer will skip configuration of networking
