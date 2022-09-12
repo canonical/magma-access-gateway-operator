@@ -27,6 +27,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         super().__init__(*args)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.config_changed, self._on_install)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -41,7 +42,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.install_magma_access_gateway_snap()
         if not self._is_configuration_valid():
             self.unit.status = BlockedStatus("Configuration is invalid. Check logs for details")
-            event.defer()
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
         self.install_magma_access_gateway()
@@ -260,7 +260,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """Validate that provided string is a list of IP addresses."""
         try:
             list_of_dns = json.loads(dns)
-            if not isinstance(list_of_dns, list):
+            if not isinstance(list_of_dns, list) or not list_of_dns:
                 return False
             try:
                 [ipaddress.ip_address(dns) for dns in list_of_dns]
