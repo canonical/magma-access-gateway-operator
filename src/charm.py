@@ -40,7 +40,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """
         self.unit.status = MaintenanceStatus("Installing AGW Snap")
         self.install_magma_access_gateway_snap()
-        if not self._is_configuration_valid():
+        if not self._is_configuration_valid:
             self.unit.status = BlockedStatus("Configuration is invalid. Check logs for details")
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
@@ -111,6 +111,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             stdout=subprocess.PIPE,
         )
 
+    @property
     def _is_configuration_valid(self) -> bool:
         """Validates configuration."""
         if self.model.config["skip-networking"]:
@@ -118,9 +119,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         valid = self._is_valid_interface("sgi", "eth0")
         if not self._is_valid_interface("s1", "eth1"):
             valid = False
-        if not self._is_valid_sgi_interface_addressing_configuration():
+        if not self._is_valid_sgi_interface_addressing_configuration:
             valid = False
-        if not self._is_valid_s1_interface_addressing_configuration():
+        if not self._is_valid_s1_interface_addressing_configuration:
             valid = False
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
@@ -154,6 +155,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return False
         return True
 
+    @property
     def _is_valid_sgi_interface_addressing_configuration(self) -> bool:
         """Validates sgi interface configuration."""
         ipv4_address = self.model.config.get("sgi-ipv4-address")
@@ -185,6 +187,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return False
         return True
 
+    @property
     def _is_valid_s1_interface_addressing_configuration(self) -> bool:
         """Validates s1 interface configuration."""
         ipv4_address = self.model.config.get("s1-ipv4-address")
