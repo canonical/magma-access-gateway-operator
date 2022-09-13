@@ -39,6 +39,10 @@ magma-access-gateway-operator:
   dns: '["8.8.8.8", "208.67.222.222"]'
 ```
 
+*WARNING* IPv6 support has been added to Magma in version 1.7.0. This charm
+installs the right version, but your orchestrator will need to be at 1.7.0
+minimum also.
+
 You can then deploy the Access Gateway with this command:
 
 ```bash
