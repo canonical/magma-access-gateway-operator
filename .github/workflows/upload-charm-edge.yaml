@@ -1,0 +1,25 @@
+name: Upload Charm
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  charmhub-upload:
+    runs-on: ubuntu-20.04
+    name: Charmhub upload
+    steps:
+      - uses: actions/checkout@v2
+      - name: Wait for integration tests to succeed
+        uses: lewagon/wait-on-check-action@v1.1.2
+        with:
+          ref: main
+          check-name: "Integration tests"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@2.0.0-rc
+        with:
+          credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
