@@ -723,3 +723,87 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             ActiveStatus(),
         )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_when_get_access_gateway_secrets_action_then_hardware_id_and_challenge_key_are_returned(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        test_hw_id = "1234-abc-5678"
+        test_challenge_key = "whatever"
+        action_event = Mock()
+        patched_check_output.return_value = f"""Hardware ID
+------------
+{test_hw_id}
+
+Challenge key
+-----------
+{test_challenge_key}
+""".encode(
+            "utf-8"
+        )
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.set_results.call_args,
+            call({"hardware-id": test_hw_id, "challange-key": test_challenge_key}),
+        )
+
+    @patch("subprocess.run")
+    def test_given_magma_service_not_running_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run
+    ):
+        completed_process = Mock(returncode=1)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Magma is not running! Please start Magma and try again."),
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_but_gateway_info_doesnt_return_anything_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+        patched_check_output.return_value = "".encode("utf-8")
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Failed to get Magma Access Gateway secrets!"),
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_but_gateway_info_doesnt_return_values_for_secrets_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+        patched_check_output.return_value = """Hardware ID
+------------
+
+Challenge key
+-----------
+""".encode(
+            "utf-8"
+        )
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Failed to get Magma Access Gateway secrets!"),
+        )
