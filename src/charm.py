@@ -33,7 +33,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
 
-        # Action events
         self.framework.observe(
             self.on.get_access_gateway_secrets_action, self._on_get_access_gateway_secrets
         )
