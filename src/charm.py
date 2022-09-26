@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class MagmaAccessGatewayOperatorCharm(CharmBase):
     """Charm the service."""
 
-    HARDWARE_ID = "Hardware ID"
-    CHALLENGE_KEY = "Challenge key"
+    HARDWARE_ID_LABEL = "Hardware ID"
+    CHALLENGE_KEY_LABEL = "Challenge key"
 
     def __init__(self, *args):
         """Observes juju events."""
@@ -344,8 +344,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         gateway_info = subprocess.check_output(["show_gateway_info.py"]).decode().split("\n")
         gateway_info = list(filter(None, gateway_info))
         gateway_info = list(filter(lambda x: (not re.search("^-(-*)", x)), gateway_info))
-        hardware_id = gateway_info[gateway_info.index(self.HARDWARE_ID) + 1]
-        challenge_key = gateway_info[gateway_info.index(self.CHALLENGE_KEY) + 1]
+        hardware_id = gateway_info[gateway_info.index(self.HARDWARE_ID_LABEL) + 1]
+        challenge_key = gateway_info[gateway_info.index(self.CHALLENGE_KEY_LABEL) + 1]
         return hardware_id, challenge_key
 
 
