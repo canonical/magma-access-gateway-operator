@@ -80,8 +80,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         try:
             hardware_id, challenge_key = self._get_magma_secrets
-            logger.error(hardware_id)
-            logger.error(challenge_key)
             event.set_results(
                 {
                     "hardware-id": hardware_id,
