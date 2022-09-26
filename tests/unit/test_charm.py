@@ -723,3 +723,37 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             ActiveStatus(),
         )
+
+    @patch("subprocess.run")
+    @patch("subprocess.check_output")
+    def test_given_magma_is_running_when_post_install_checks_action_then_checks_start(
+        self,
+        patch_subprocess_check_output,
+        patch_subprocess_run,
+    ):
+        action_event = Mock()
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        patch_subprocess_check_output.assert_has_calls(
+            [
+                call(
+                    ["magma-access-gateway.post-install"]
+                ),
+            ]
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_is_not_running_when_post_install_checks_action_then_checks_not_start(
+        self, 
+        patch_subprocess_run,
+        patch_check_output
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=1)
+        action_event = Mock()
+
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        patch_check_output.assert_not_called()

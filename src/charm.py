@@ -12,7 +12,7 @@ import subprocess
 from typing import List
 
 import netifaces  # type: ignore[import]
-from ops.charm import CharmBase, InstallEvent, StartEvent
+from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -28,6 +28,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
+        self.framework.observe(self.on.post_install_checks_action, self._on_post_install_checks_action)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -63,6 +64,23 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             event.defer()
             return
         self.unit.status = ActiveStatus()
+
+    def _on_post_install_checks_action(self, event: ActionEvent):
+        """Triggered on post install checks action.
+
+        Args:
+            event: Juju event (ActionEvent)
+
+        Returns:
+            None
+        """
+        if not self._magma_service_is_running:
+            event.fail("Magma is not running! Please start Magma and try again.")
+            return
+        
+        command = ["magma-access-gateway.post-install"]
+        post_install_checks_output = subprocess.check_output(command).encode("utf-8").rstrip()
+        event.set_results({"post-install-checks-output": post_install_checks_output})
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
@@ -288,6 +306,15 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         for key, value in config.items():
             arguments.extend([f"--{key}", value])
         return arguments
+
+    @property
+    def _magma_service_is_running(self) -> bool:
+        """Checks whether magma is running."""
+        magma_service = subprocess.run(
+            ["systemctl", "is-active", "magma@magmad"],
+            stdout=subprocess.PIPE,
+        )
+        return magma_service.returncode == 0
 
 
 if __name__ == "__main__":
