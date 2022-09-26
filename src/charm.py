@@ -8,6 +8,8 @@ import copy
 import ipaddress
 import json
 import logging
+import os
+import re
 import subprocess
 from typing import List
 
@@ -28,7 +30,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
-        self.framework.observe(self.on.post_install_checks_action, self._on_post_install_checks_action)
+        self.framework.observe(
+            self.on.post_install_checks_action, self._on_post_install_checks_action
+        )
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -46,6 +50,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
         self.install_magma_access_gateway()
+        orc8r_domain = self.model.config.get("orc8r-domain")
+        root_ca_path = self.model.config.get("root-ca-path")
+        self.configure_magma_access_gateway(orc8r_domain, root_ca_path)  # type: ignore[arg-type]
 
     def _on_start(self, event: StartEvent):
         """Triggered on start event.
@@ -77,9 +84,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         if not self._magma_service_is_running:
             event.fail("Magma is not running! Please start Magma and try again.")
             return
-        
+
         command = ["magma-access-gateway.post-install"]
-        post_install_checks_output = subprocess.check_output(command).encode("utf-8").rstrip()
+        post_install_checks_output = subprocess.check_output(command).decode("utf-8").rstrip()
         event.set_results({"post-install-checks-output": post_install_checks_output})
 
     @staticmethod
@@ -144,7 +151,40 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
             valid = False
+        if not self._is_valid_rootca_pem_path:
+            logger.warning("Invalid RootCA certificate")
+            valid = False
+        if not self._is_valid_orc8r_domain(self.model.config["orc8r-domain"]):
+            logger.warning("Invalid Orchestrator domain")
+            valid = False
         return valid
+
+    @staticmethod
+    def _is_valid_orc8r_domain(orc8r_domain: str) -> bool:
+        """Validates Orchestrator domain.
+
+        Args:
+            orc8r_domain (str): Orchestrator domain.
+
+        Returns:
+            bool: True if Orchestrator domain is valid, False otherwise.
+        """
+        if not orc8r_domain:
+            return False
+        if re.match(
+            "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]",  # noqa: W605, E501
+            orc8r_domain,
+        ):
+            return True
+        return False
+
+    @staticmethod
+    def _is_valid_rootca_pem_path(rootca_pem_path: str) -> bool:
+        """Validate that provided string is a valid path to rootCA.pem file."""
+        try:
+            return os.path.isfile(rootca_pem_path) if rootca_pem_path else True
+        except ValueError:
+            return False
 
     def _is_valid_interface(self, interface_name: str, new_interface_name: str) -> bool:
         """Validates a network interface name.
@@ -299,6 +339,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             List of arguments for install command
         """
         config = dict(copy.deepcopy(self.model.config))
+        exclude_arguments = ["orc8r-domain", "root-ca-path"]
+        [config.pop(argument) for argument in exclude_arguments]
         if config.pop("skip-networking"):
             return ["--skip-networking"]
         arguments = ["--dns"]

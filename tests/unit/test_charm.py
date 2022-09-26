@@ -571,14 +571,25 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
+    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_orc8r_domain")
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_valid_dhcp_config_when_install_then_status_is_active(
-        self, patch_interfaces, patch_subprocess_run
+    def test_given_valid_dhcp_orc8r_domain_and_rootca_path_configs_when_install_then_status_is_active(  # noqa: E501
+        self, patch_interfaces, patch_subprocess_run, patch_is_valid_orc8r_domain
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
+        patch_is_valid_orc8r_domain.return_value = True
+        example_domain = "example.com"
+        example_rootca_path = "/blabla/rootca.pem"
+        self.harness.update_config(
+            {
+                "sgi": "enp0s1",
+                "s1": "enp0s2",
+                "orc8r-domain": example_domain,
+                "root-ca-path": example_rootca_path,
+            }
+        )
         self.harness.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
@@ -599,6 +610,16 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     ],
                     stdout=-1,
                 ),
+                call(
+                    [
+                        "magma-access-gateway.configure",
+                        "--domain",
+                        example_domain,
+                        "--root-ca-pem-path",
+                        example_rootca_path,
+                    ],
+                    stdout=-1,
+                ),
             ]
         )
         self.assertEqual(
@@ -606,13 +627,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             MaintenanceStatus("Installing AGW"),
         )
 
+    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_orc8r_domain")
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_valid_static_config_when_install_then_status_is_maintenance(
-        self, patch_interfaces, patch_subprocess_run
+        self, patch_interfaces, patch_subprocess_run, patch_is_valid_orc8r_domain
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
+        patch_is_valid_orc8r_domain.return_value = True
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
         self.harness.update_config(
             {
@@ -733,23 +756,19 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
     ):
         action_event = Mock()
         patch_subprocess_run.return_value = Mock(returncode=0)
-        
+
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
         patch_subprocess_check_output.assert_has_calls(
             [
-                call(
-                    ["magma-access-gateway.post-install"]
-                ),
+                call(["magma-access-gateway.post-install"]),
             ]
         )
 
     @patch("subprocess.check_output")
     @patch("subprocess.run")
     def test_given_magma_is_not_running_when_post_install_checks_action_then_checks_not_start(
-        self, 
-        patch_subprocess_run,
-        patch_check_output
+        self, patch_subprocess_run, patch_check_output
     ):
         patch_subprocess_run.return_value = Mock(returncode=1)
         action_event = Mock()
@@ -757,3 +776,20 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
         patch_check_output.assert_not_called()
+
+    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_interface")
+    def test_given_invalid_domain_when_install_then_status_is_blocked(
+        self,
+        patch_is_valid_interface,
+    ):
+        # patch_is_valid_interface.return_value = False
+
+        with self.assertLogs() as captured:
+            self.harness.update_config({"orc8r-domain": "invalid"})
+
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Configuration is invalid. Check logs for details"),
+        )
+
+        self.assertEqual("Invalid Orchestrator domain", captured.records[0].getMessage())
