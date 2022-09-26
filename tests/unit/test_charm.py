@@ -723,3 +723,61 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             self.harness.charm.unit.status,
             ActiveStatus(),
         )
+
+    @patch("subprocess.run")
+    def test_given_magmad_service_not_running_when_run_post_install_checks_then_action_fails(
+        self, patch_subprocess_run
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=1)
+        action_event = Mock()
+
+        self.harness.charm._on_run_post_install_checks(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Magma is not running! Please start Magma and try again."),
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magmad_service_running_when_run_post_install_checks_then_action_runs(
+        self, patch_subprocess_run, patch_check_output
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        action_event = Mock()
+        patch_check_output.return_value = """
+Magma AGW Post-Install: Starting Magma AGW post-installation checks...
+Magma AGW Post-Install: Checking network interfaces configuration...
+Magma AGW Post-Install: ERROR: Following interfaces are not configured: eth0 eth1 gtp_br0 uplink_br0
+Most common reasons for this error include:
+  - Invalid configuration in /etc/netplan/99-magma-config.yaml.
+  - Interface not being connected to the network.
+  - Problem with Open vSwitch installation.
+"""
+
+        self.harness.charm._on_run_post_install_checks(action_event)
+
+        assert  "Magma AGW Post-Install: Starting Magma AGW post-installation checks..." in action_event.results
+
+    @patch("subprocess.run")
+    def test_given_no_rootCA_path_config_when_on_install_then_status_is_blocked(
+        self, 
+        patch_subprocess_run
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        event = Mock()
+        with self.assertLogs() as captured:
+            self.harness.charm._on_install(event=event)
+        
+        self.harness.update_config(
+            {
+                "rootCA-path": "",
+            }
+        )
+        self.harness.charm._on_install(event=Mock())
+
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Configuration is invalid. Check logs for details"),
+        )
+        self.assertEqual("Invalid rootCA.pem path configuration", captured.records[0].getMessage())

@@ -1,0 +1,7 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+run-post-install-checks:
+  description: |
+    Runs Access Gateway post-install checks. It will only pass if successful
+    integration with the Orchestrator.

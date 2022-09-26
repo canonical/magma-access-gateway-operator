@@ -1,8 +1,44 @@
 # magma-access-gateway-operator
 
+## Description
+
+Magma is an open-source software platform that gives network operators a mobile core network
+solution. Magma has three major components:
+
+1. **Access Gateway**
+2. Orchestrator
+3. Federation Gateway
+
 The Access Gateway (AGW) provides network services and policy enforcement. In an LTE network,
 the AGW implements an evolved packet core (EPC), and a combination of an AAA and a PGW. It works
-with existing, unmodified commercial radio hardware.
+with existing, unmodified commercial radio hardware.<br>
+For more information on Magma please visit the [official website](https://magmacore.org/).
+
+> :warning: Installing this snap will affect your computer's networking configuration.
+> Make sure it is installed on designated hardware (personal computers are strongly discouraged).
+
+## System requirements
+
+### Hardware (baremetal strongly recommended)
+
+- Processor: x86-64 dual-core processor (around 2GHz clock speed or faster)
+- Memory: 4GB RAM
+- Storage: 32GB or greater SSD
+
+### Networking
+
+At least two ethernet interfaces (SGi and S1)
+
+- SGi for internet connectivity
+- S1 for enodeB connectivity
+
+### Operating System
+
+- Ubuntu 20.04 LTS
+  ([Ubuntu installation guide](https://help.ubuntu.com/lts/installation-guide/amd64/index.html))
+- Linux Kernel version `5.4`
+
+> :warning: Some clouds like AWS use newer kernel versions by default. If you want to downgrade your kernel, please refer to the following [guide](https://discourse.ubuntu.com/t/how-to-downgrade-the-kernel-on-ubuntu-20-04-to-the-5-4-lts-version/26459).
 
 ## Usage
 
@@ -14,13 +50,19 @@ to the eNodeB).
 Production deployment are highly recommended to be deployed on physical
 hardware.
 
-For testing the deployment, a VM with two DHCP networks attached will do. You
-can use this command to deploy it. The interface names will need to be adjusted
-based on your specific machine.
+### 1. Install
+
+**Using DHCP network configuration**
+
+For testing the deployment, a VM with two DHCP networks attached will do. Use this command to deploy it:
+
+> :warning: The interface names will need to be adjusted based on your specific machine.
 
 ```bash
 juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2
 ```
+
+**Using static network configuration**
 
 For static network configuration, the easiest method is to use a YAML
 configuration file:
@@ -39,12 +81,39 @@ magma-access-gateway-operator:
   dns: '["8.8.8.8", "208.67.222.222"]'
 ```
 
-*WARNING* IPv6 support has been added to Magma in version 1.7.0. This charm
+_WARNING_ IPv6 support has been added to Magma in version 1.7.0. This charm
 installs the right version, but your orchestrator will need to be at 1.7.0
 minimum also.
 
-You can then deploy the Access Gateway with this command:
+Deploy the Access Gateway with this command:
 
 ```bash
 juju deploy magma-access-gateway-operator --config agw_config.yaml
 ```
+
+### 2. Configure
+
+Fetch `rootCA.pem` certificate from Orchestrator deployment:
+
+```bash
+juju scp --container="magma-orc8r-certifier" orc8r-certifier/0:/var/opt/magma/certs/rootCA.pem rootCA.pem
+```
+
+Upload it to the Access Gateway host and execute:
+
+# TODO: Command to provide `rootCA.pem`
+```bash
+juju config 
+```
+
+### 3. Verify the deployment
+
+Run the following command:
+
+```bash
+juju run-action run-post-install-checks --wait
+```
+
+Successful Magma AGW deployment check will be indicated by the `Magma AGW post-installation checks finished successfully.` message.
+
+> :warning: Success will only occur when attached with the Orchestrator.

@@ -4,6 +4,7 @@
 
 """Machine Charm for Magma's Access Gateway."""
 
+import os
 import copy
 import ipaddress
 import json
@@ -12,7 +13,7 @@ import subprocess
 from typing import List
 
 import netifaces  # type: ignore[import]
-from ops.charm import CharmBase, InstallEvent, StartEvent
+from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -28,6 +29,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
+        self.framework.observe(self.on.run_post_install_checks_action, self._on_run_post_install_checks)
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -64,6 +66,35 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         self.unit.status = ActiveStatus()
 
+    def _on_run_post_install_checks(self, event: ActionEvent) -> None:
+        """Triggered on run_post_install_checks event.
+
+        Args:
+            event: Juju event (ActionEvent)
+
+        Returns:
+            None
+        """
+        if not self._magma_service_is_running:
+            event.fail("Magma is not running! Please start Magma and try again.")
+            return
+        
+        logger.info("Running post-install checks")
+        command = ["magma-access-gateway.post-install"]
+        try:
+            post_install_checks_output = subprocess.check_output(command).decode("utf-8").rstrip()
+            event.set_results(
+                {
+                    "post-install-checks-output": post_install_checks_output,
+                }
+            )
+        except (subprocess.CalledProcessError, IndexError, ValueError):
+            event.fail("Failed to run post-install checks. Please check the logs for details.")
+            return
+        except Exception as e:
+            event.fail(str(e))
+            return
+
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
         """Installs Magma Access Gateway snap.
@@ -88,9 +119,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             command,
             stdout=subprocess.PIPE,
         )
-
-    @staticmethod
-    def configure_magma_access_gateway(orc8r_domain: str, root_ca_path: str) -> None:
+        
+    # TODO: Use this method when orc8r - AGW relation is implemented. And remove cert config
+    def configure_magma_access_gateway(self, orc8r_domain: str, root_ca_path: str) -> None:
         """Configures Magma Access Gateway to connect to an Orchestrator.
 
         Args:
@@ -100,6 +131,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
+        orc8r_domain = self.model.config.get("orc8r-domain")
+        root_ca_path = self.model.config.get("root-ca-path")
+        
         subprocess.run(
             [
                 "magma-access-gateway.configure",
@@ -125,6 +159,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             valid = False
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
+            valid = False
+        if not self._is_valid_rootCA_pem_path(self.model.config["rootCA-path"]):
+            logger.warning("Invalid rootCA.pem path configuration")
             valid = False
         return valid
 
@@ -273,6 +310,15 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return False
         return True
 
+    @staticmethod
+    def _is_valid_rootCA_pem_path(rootCA_pem_path: str) -> bool:
+        """Validate that provided string is a valid path to rootCA.pem file"""
+        try:
+            return os.path.isfile(rootCA_pem_path) if rootCA_pem_path else True
+        except ValueError:
+            logger.error("rootCA.pem file not found in the provided path")
+            return False
+
     @property
     def _install_arguments(self) -> List[str]:
         """Prepares argument list for install command from configuration.
@@ -288,6 +334,15 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         for key, value in config.items():
             arguments.extend([f"--{key}", value])
         return arguments
+
+    @property
+    def _magma_service_is_running(self) -> bool:
+        """Checks whether magma is running."""
+        magma_service = subprocess.run(
+            ["systemctl", "is-active", "magma@magmad"],
+            stdout=subprocess.PIPE,
+        )
+        return magma_service.returncode == 0
 
 
 if __name__ == "__main__":
