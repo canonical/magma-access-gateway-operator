@@ -1,0 +1,7 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+get-access-gateway-secrets:
+  description: |
+    Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with 
+    the Orchestrator.

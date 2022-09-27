@@ -8,11 +8,12 @@ import copy
 import ipaddress
 import json
 import logging
+import re
 import subprocess
-from typing import List
+from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
-from ops.charm import CharmBase, InstallEvent, StartEvent
+from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -22,12 +23,19 @@ logger = logging.getLogger(__name__)
 class MagmaAccessGatewayOperatorCharm(CharmBase):
     """Charm the service."""
 
+    HARDWARE_ID_LABEL = "Hardware ID"
+    CHALLENGE_KEY_LABEL = "Challenge key"
+
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
+
+        self.framework.observe(
+            self.on.get_access_gateway_secrets_action, self._on_get_access_gateway_secrets
+        )
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -55,14 +63,34 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
-        magma_service = subprocess.run(
-            ["systemctl", "is-active", "magma@magmad"],
-            stdout=subprocess.PIPE,
-        )
-        if magma_service.returncode != 0:
+        if not self._magma_service_is_running:
             event.defer()
             return
         self.unit.status = ActiveStatus()
+
+    def _on_get_access_gateway_secrets(self, event: ActionEvent) -> None:
+        """Triggered on get-access-gateway-secrets action call.
+
+        Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with
+        the Orchestrator.
+        """
+        if not self._magma_service_is_running:
+            event.fail("Magma is not running! Please start Magma and try again.")
+            return
+        try:
+            hardware_id, challenge_key = self._get_magma_secrets
+            event.set_results(
+                {
+                    "hardware-id": hardware_id,
+                    "challange-key": challenge_key,
+                }
+            )
+        except (subprocess.CalledProcessError, IndexError, ValueError):
+            event.fail("Failed to get Magma Access Gateway secrets!")
+            return
+        except Exception as e:
+            event.fail(str(e))
+            return
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
@@ -288,6 +316,36 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         for key, value in config.items():
             arguments.extend([f"--{key}", value])
         return arguments
+
+    @property
+    def _magma_service_is_running(self) -> bool:
+        """Checks whether magma is running."""
+        magma_service = subprocess.run(
+            ["systemctl", "is-active", "magma@magmad"],
+            stdout=subprocess.PIPE,
+        )
+        if magma_service.returncode != 0:
+            return False
+        return True
+
+    @property
+    def _get_magma_secrets(self) -> Tuple[Optional[str], Optional[str]]:
+        """Gets Access Gateway's Hardware ID and Challenge key.
+
+        Hardware ID and Challenge key are available through the `show_gateway_info` script
+        provided by the Access Gateway. This method filers out required values from the script's
+        output.
+
+        Returns:
+            str: Hardware ID
+            str: Challenge key
+        """
+        gateway_info = subprocess.check_output(["show_gateway_info.py"]).decode().split("\n")
+        gateway_info = list(filter(None, gateway_info))
+        gateway_info = list(filter(lambda x: (not re.search("^-(-*)", x)), gateway_info))
+        hardware_id = gateway_info[gateway_info.index(self.HARDWARE_ID_LABEL) + 1]
+        challenge_key = gateway_info[gateway_info.index(self.CHALLENGE_KEY_LABEL) + 1]
+        return hardware_id, challenge_key
 
 
 if __name__ == "__main__":
