@@ -613,7 +613,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_valid_dhcp_config_when_install_then_status_is_active(
+    def test_given_valid_dhcp_config_when_update_config_then_status_is_active(
         self, patch_interfaces, patch_subprocess_run
     ):
         event = Mock()
@@ -626,7 +626,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             Mock(returncode=0),
         ]
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.charm._on_install(event=event)
+        self.harness.charm._on_start(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -649,12 +649,12 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     stdout=-1,
                 ),
                 call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
+                call(["systemctl", "is-active", "magma@magmad"], stdout=-1),
             ]
         )
         self.assertEqual(
             self.harness.charm.unit.status,
-            MaintenanceStatus("Rebooting to apply changes"),
+            ActiveStatus(),
         )
 
     @patch("subprocess.run")
