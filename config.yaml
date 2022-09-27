@@ -37,8 +37,6 @@ options:
   orc8r-domain:
     description: Orc8r domain.
     type: string
-    default: false
   root-ca-path:
     description: rootca.pem path to file.
     type: string
-    default: false

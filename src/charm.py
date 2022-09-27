@@ -72,23 +72,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         self.unit.status = ActiveStatus()
 
-    def _on_post_install_checks_action(self, event: ActionEvent):
-        """Triggered on post install checks action.
-
-        Args:
-            event: Juju event (ActionEvent)
-
-        Returns:
-            None
-        """
-        if not self._magma_service_is_running:
-            event.fail("Magma is not running! Please start Magma and try again.")
-            return
-
-        command = ["magma-access-gateway.post-install"]
-        post_install_checks_output = subprocess.check_output(command).decode("utf-8").rstrip()
-        event.set_results({"post-install-checks-output": post_install_checks_output})
-
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
         """Installs Magma Access Gateway snap.
@@ -100,6 +83,27 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             ["snap", "install", "magma-access-gateway", "--classic", "--edge"],
             stdout=subprocess.PIPE,
         )
+
+    def _on_post_install_checks_action(self, event: ActionEvent) -> None:
+        """Triggered on post install checks action.
+
+        Args:
+            event: Juju event (ActionEvent)
+
+        Returns:
+            None
+        """
+        if not self._magma_service_is_running:
+            event.fail("Magma is not running! Please start Magma and try again.")
+            return
+        command = ["magma-access-gateway.post-install"]
+        try:
+            post_install_checks_output = subprocess.check_output(command).decode("utf-8").rstrip()
+            event.set_results({"post-install-checks-output": post_install_checks_output})
+        except (subprocess.CalledProcessError, IndexError, ValueError):
+            event.fail("Failed to run jpost-install checks.")
+        except Exception as e:
+            event.fail(str(e))
 
     def install_magma_access_gateway(self) -> None:
         """Installs Magma access gateway on the host.

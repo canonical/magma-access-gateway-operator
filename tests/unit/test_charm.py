@@ -777,19 +777,34 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
         patch_check_output.assert_not_called()
 
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def _test_given_magma_service_running_but_post_install_checks_doesnt_return_anything_when_post_install_checks_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        action_event = Mock()
+        patched_check_output.return_value = "".encode("utf-8")
+
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Failed to get Magma Access Gateway secrets!"),
+        )
+
     @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_interface")
     def test_given_invalid_domain_when_install_then_status_is_blocked(
         self,
         patch_is_valid_interface,
     ):
-        # patch_is_valid_interface.return_value = False
 
         with self.assertLogs() as captured:
             self.harness.update_config({"orc8r-domain": "invalid"})
+
+        self.assertEqual("Invalid Orchestrator domain", captured.records[0].getMessage())
 
         self.assertEqual(
             self.harness.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
-
-        self.assertEqual("Invalid Orchestrator domain", captured.records[0].getMessage())
