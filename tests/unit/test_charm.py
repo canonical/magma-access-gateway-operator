@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 from ops import testing
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
@@ -18,11 +18,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
 
+    @patch(
+        "test_charm.MagmaAccessGatewayOperatorCharm._is_magmad_enabled", new_callable=PropertyMock
+    )
     @patch("subprocess.run")
     def test_given_no_config_provided_when_install_then_snap_is_installed_and_status_is_blocked(
-        self, patch_subprocess_run
+        self, patch_subprocess_run, patch_magmad_enabled
     ):
         event = Mock()
+        patch_magmad_enabled.return_value = False
         with self.assertLogs() as captured:
             self.harness.charm._on_install(event=event)
 
@@ -40,11 +44,17 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.assertEqual("sgi interface name is required", captured.records[0].getMessage())
         self.assertEqual("s1 interface name is required", captured.records[1].getMessage())
 
+    @patch(
+        "test_charm.MagmaAccessGatewayOperatorCharm._is_magmad_enabled", new_callable=PropertyMock
+    )
     @patch("subprocess.run")
     def test_given_skip_networking_config_provided_when_install_then_snap_is_installed_and_status_is_maintenance(  # noqa: E501
-        self, patch_subprocess_run
+        self, patch_subprocess_run, patch_magmad_enabled
     ):
         event = Mock()
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        patch_magmad_enabled.return_value = False
         self.harness.update_config({"skip-networking": "True"})
         self.harness.charm._on_install(event=event)
 
@@ -54,14 +64,40 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
                 ),
                 call(
-                    ["magma-access-gateway.install", "--skip-networking"],
+                    ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
                     stdout=-1,
                 ),
             ]
         )
         self.assertEqual(
             self.harness.charm.unit.status,
-            MaintenanceStatus("Installing AGW"),
+            MaintenanceStatus("Rebooting to apply changes"),
+        )
+
+    @patch("subprocess.run")
+    def test_given_skip_networking_config_provided_when_install_fails_then_status_is_blocked(  # noqa: E501
+        self, patch_subprocess_run
+    ):
+        event = Mock()
+        completed_process = Mock(returncode=1)
+        patch_subprocess_run.return_value = completed_process
+        self.harness.update_config({"skip-networking": "True"})
+        self.harness.charm._on_install(event=event)
+
+        patch_subprocess_run.assert_has_calls(
+            [
+                call(
+                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                ),
+                call(
+                    ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
+                    stdout=-1,
+                ),
+            ]
+        )
+        self.assertEqual(
+            self.harness.charm.unit.status,
+            BlockedStatus("Installation script failed. See logs for details"),
         )
 
     @patch("subprocess.run")
@@ -571,13 +607,19 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
+    @patch(
+        "test_charm.MagmaAccessGatewayOperatorCharm._is_magmad_enabled", new_callable=PropertyMock
+    )
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_valid_dhcp_config_when_install_then_status_is_active(
-        self, patch_interfaces, patch_subprocess_run
+        self, patch_interfaces, patch_subprocess_run, patch_magmad_enabled
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        patch_magmad_enabled.return_value = False
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
         self.harness.charm._on_install(event=event)
 
@@ -589,6 +631,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 call(
                     [
                         "magma-access-gateway.install",
+                        "--no-reboot",
                         "--dns",
                         "8.8.8.8",
                         "208.67.222.222",
@@ -603,16 +646,22 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         )
         self.assertEqual(
             self.harness.charm.unit.status,
-            MaintenanceStatus("Installing AGW"),
+            MaintenanceStatus("Rebooting to apply changes"),
         )
 
+    @patch(
+        "test_charm.MagmaAccessGatewayOperatorCharm._is_magmad_enabled", new_callable=PropertyMock
+    )
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_valid_static_config_when_install_then_status_is_maintenance(
-        self, patch_interfaces, patch_subprocess_run
+        self, patch_interfaces, patch_subprocess_run, patch_magmad_enabled
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        patch_magmad_enabled.return_value = False
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
         self.harness.update_config(
             {
@@ -646,6 +695,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 call(
                     [
                         "magma-access-gateway.install",
+                        "--no-reboot",
                         "--dns",
                         "8.8.8.8",
                         "208.67.222.222",
@@ -672,7 +722,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         )
         self.assertEqual(
             self.harness.charm.unit.status,
-            MaintenanceStatus("Installing AGW"),
+            MaintenanceStatus("Rebooting to apply changes"),
         )
 
     @patch("subprocess.run")
@@ -807,3 +857,19 @@ Challenge key
             action_event.fail.call_args,
             call("Failed to get Magma Access Gateway secrets!"),
         )
+
+    @patch(
+        "test_charm.MagmaAccessGatewayOperatorCharm._is_magmad_enabled", new_callable=PropertyMock
+    )
+    @patch("subprocess.run")
+    def test_given_magma_service_enabled_when_install_then_nothing_done(
+        self, patch_subprocess_run, patch_magmad_enabled
+    ):
+        event = Mock()
+        patch_magmad_enabled.return_value = True
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+
+        self.harness.charm._on_install(event=event)
+
+        patch_subprocess_run.assert_not_called()
