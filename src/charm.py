@@ -46,13 +46,20 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
+        if self._is_magmad_enabled:
+            return
         self.unit.status = MaintenanceStatus("Installing AGW Snap")
         self.install_magma_access_gateway_snap()
         if not self._is_configuration_valid:
             self.unit.status = BlockedStatus("Configuration is invalid. Check logs for details")
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
-        self.install_magma_access_gateway()
+        returncode = self.install_magma_access_gateway()
+        if returncode != 0:
+            self.unit.status = BlockedStatus("Installation script failed. See logs for details")
+            return
+        self.unit.status = MaintenanceStatus("Rebooting to apply changes")
+        self.reboot()
 
     def _on_start(self, event: StartEvent):
         """Triggered on start event.
@@ -104,16 +111,25 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             stdout=subprocess.PIPE,
         )
 
-    def install_magma_access_gateway(self) -> None:
+    def install_magma_access_gateway(self) -> int:
         """Installs Magma access gateway on the host.
 
         Returns:
-            None
+            Return code of the installation script
         """
         command = ["magma-access-gateway.install"]
         command.extend(self._install_arguments)
-        subprocess.run(
+        install_process = subprocess.run(
             command,
+            stdout=subprocess.PIPE,
+        )
+        logger.info(install_process.stdout)
+        return install_process.returncode
+
+    def reboot(self) -> None:
+        """Sends the command to reboot the machine in 1 minute."""
+        subprocess.run(
+            ["shutdown", "--reboot", "+1"],
             stdout=subprocess.PIPE,
         )
 
@@ -310,8 +326,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """
         config = dict(copy.deepcopy(self.model.config))
         if config.pop("skip-networking"):
-            return ["--skip-networking"]
-        arguments = ["--dns"]
+            return ["--no-reboot", "--skip-networking"]
+        arguments = ["--no-reboot", "--dns"]
         arguments.extend(json.loads(config.pop("dns")))
         for key, value in config.items():
             arguments.extend([f"--{key}", value])
@@ -346,6 +362,15 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         hardware_id = gateway_info[gateway_info.index(self.HARDWARE_ID_LABEL) + 1]
         challenge_key = gateway_info[gateway_info.index(self.CHALLENGE_KEY_LABEL) + 1]
         return hardware_id, challenge_key
+
+    @property
+    def _is_magmad_enabled(self) -> bool:
+        """Validates if magmad service is enabled."""
+        magma_service = subprocess.run(
+            ["systemctl", "is-enabled", "magma@magmad"],
+            stdout=subprocess.PIPE,
+        )
+        return not magma_service.returncode
 
 
 if __name__ == "__main__":
