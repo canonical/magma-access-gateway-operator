@@ -34,9 +34,3 @@ options:
     description: JSON list of DNS servers to configure
     type: string
     default: '["8.8.8.8", "208.67.222.222"]'
-  orc8r-domain:
-    description: Orc8r domain.
-    type: string
-  root-ca-path:
-    description: rootca.pem path to file.
-    type: string

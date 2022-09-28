@@ -91,28 +91,26 @@ Deploy the Access Gateway with this command:
 juju deploy magma-access-gateway-operator --config agw_config.yaml
 ```
 
-### 2. Configure
+### 2. Register AGW with an Orchestrator
 
-Fetch `rootCA.pem` certificate from Orchestrator deployment:
+Fetch AGW's `Hardware ID` and `Challenge Key`:
 
 ```bash
-juju scp --container="magma-orc8r-certifier" orc8r-certifier/0:/var/opt/magma/certs/rootCA.pem rootCA.pem
+juju run-action magma-access-gateway-operator/<unit number> get-access-gateway-secrets --wait
 ```
 
-Upload it to the Access Gateway host and execute:
+Navigate to "Equipment" on the NMS via the left navigation bar, hit "Add Gateway" on the upper right, and fill out the multi-step modal form. Use the secrets from above for the "Hardware UUID" and "Challenge Key" fields.
 
-**TODO: Add command when implemented**
-```bash
-```
+**TODO: Fill when orc8r-AGW relation ready**
 
 ### 3. Verify the deployment
 
 Run the following command:
 
 ```bash
-juju run-action post-install-checks --wait
+juju run-action magma-access-gateway-operator/<unit number> post-install-checks --wait
 ```
 
-Successful Magma AGW deployment check will be indicated by the `Magma AGW post-installation checks finished successfully.` message.
+Successful AGW deployment will be indicated by the `Magma AGW post-installation checks finished successfully.` message.
 
-> :warning: Success will only occur when attached with the Orchestrator.
+> :warning: Success will only occur when attached with an Orchestrator.

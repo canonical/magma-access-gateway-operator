@@ -59,6 +59,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 ),
             ]
         )
+
         self.assertEqual(
             self.harness.charm.unit.status,
             MaintenanceStatus("Installing AGW"),
@@ -571,25 +572,14 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_orc8r_domain")
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_valid_dhcp_orc8r_domain_and_rootca_path_configs_when_install_then_status_is_active(  # noqa: E501
-        self, patch_interfaces, patch_subprocess_run, patch_is_valid_orc8r_domain
+    def test_given_valid_dhcp_config_when_install_then_status_is_active(
+        self, patch_interfaces, patch_subprocess_run
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        patch_is_valid_orc8r_domain.return_value = True
-        example_domain = "example.com"
-        example_rootca_path = "/blabla/rootca.pem"
-        self.harness.update_config(
-            {
-                "sgi": "enp0s1",
-                "s1": "enp0s2",
-                "orc8r-domain": example_domain,
-                "root-ca-path": example_rootca_path,
-            }
-        )
+        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
         self.harness.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
@@ -610,16 +600,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     ],
                     stdout=-1,
                 ),
-                call(
-                    [
-                        "magma-access-gateway.configure",
-                        "--domain",
-                        example_domain,
-                        "--root-ca-pem-path",
-                        example_rootca_path,
-                    ],
-                    stdout=-1,
-                ),
             ]
         )
         self.assertEqual(
@@ -627,15 +607,13 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             MaintenanceStatus("Installing AGW"),
         )
 
-    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_orc8r_domain")
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_valid_static_config_when_install_then_status_is_maintenance(
-        self, patch_interfaces, patch_subprocess_run, patch_is_valid_orc8r_domain
+        self, patch_interfaces, patch_subprocess_run
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        patch_is_valid_orc8r_domain.return_value = True
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
         self.harness.update_config(
             {
@@ -747,9 +725,110 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ActiveStatus(),
         )
 
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_when_get_access_gateway_secrets_action_then_hardware_id_and_challenge_key_are_returned(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        test_hw_id = "1234-abc-5678"
+        test_challenge_key = "whatever"
+        action_event = Mock()
+        patched_check_output.return_value = f"""Hardware ID
+------------
+{test_hw_id}
+
+Challenge key
+-----------
+{test_challenge_key}
+""".encode(
+            "utf-8"
+        )
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.set_results.call_args,
+            call({"hardware-id": test_hw_id, "challange-key": test_challenge_key}),
+        )
+
+    @patch("subprocess.run")
+    def test_given_magma_service_not_running_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run
+    ):
+        completed_process = Mock(returncode=1)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Magma is not running! Please start Magma and try again."),
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_but_gateway_info_doesnt_return_anything_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+        patched_check_output.return_value = "".encode("utf-8")
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Failed to get Magma Access Gateway secrets!"),
+        )
+
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_running_but_gateway_info_doesnt_return_values_for_secrets_when_get_access_gateway_secrets_action_then_action_fails(  # noqa: E501
+        self, patch_subprocess_run, patched_check_output
+    ):
+        completed_process = Mock(returncode=0)
+        patch_subprocess_run.return_value = completed_process
+        action_event = Mock()
+        patched_check_output.return_value = """Hardware ID
+------------
+
+Challenge key
+-----------
+""".encode(
+            "utf-8"
+        )
+
+        self.harness.charm._on_get_access_gateway_secrets(action_event)
+
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Failed to get Magma Access Gateway secrets!"),
+        )
+
+    # TODO: post install tests
+    @patch("subprocess.check_output")
+    @patch("subprocess.run")
+    def test_given_magma_service_is_not_running_when_post_install_checks_action_then_checks_not_start(  # noqa: E501
+        self, patch_subprocess_run, patch_check_output
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=1)
+        action_event = Mock()
+
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        patch_check_output.assert_not_called()
+        self.assertEqual(
+            action_event.fail.call_args,
+            call("Magma is not running! Please start Magma and try again."),
+        )
+
     @patch("subprocess.run")
     @patch("subprocess.check_output")
-    def test_given_magma_is_running_when_post_install_checks_action_then_checks_start(
+    def test_given_magma_service_is_running_when_post_install_checks_action_then_checks_start(
         self,
         patch_subprocess_check_output,
         patch_subprocess_run,
@@ -767,44 +846,34 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
     @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def test_given_magma_is_not_running_when_post_install_checks_action_then_checks_not_start(
+    def test_given_magma_service_is_running_and_agw_not_configured_when_post_install_checks_action_then_checks_fails_and_redirects_user_to_journalctl_logs(  # noqa: E501
         self, patch_subprocess_run, patch_check_output
     ):
-        patch_subprocess_run.return_value = Mock(returncode=1)
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        patch_check_output.return_value = "dummy post-install check output".encode("utf-8")
+        checks_failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
         action_event = Mock()
 
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
-        patch_check_output.assert_not_called()
+        self.assertEqual(
+            action_event.set_results.call_args,
+            call({"post-install-checks-output": checks_failed_msg}),
+        )
 
     @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def _test_given_magma_service_running_but_post_install_checks_doesnt_return_anything_when_post_install_checks_action_then_action_fails(  # noqa: E501
-        self, patch_subprocess_run, patched_check_output
+    def test_given_magma_service_is_running_and_agw_propperly_configured_when_post_install_checks_action_then_checks_succeeds(  # noqa: E501
+        self, patch_subprocess_run, patch_check_output
     ):
         patch_subprocess_run.return_value = Mock(returncode=0)
+        successful_output = "Magma AGW post-installation checks finished successfully."
+        patch_check_output.return_value = successful_output.encode("utf-8")
         action_event = Mock()
-        patched_check_output.return_value = "".encode("utf-8")
 
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
         self.assertEqual(
-            action_event.fail.call_args,
-            call("Failed to get Magma Access Gateway secrets!"),
-        )
-
-    @patch("charm.MagmaAccessGatewayOperatorCharm._is_valid_interface")
-    def test_given_invalid_domain_when_install_then_status_is_blocked(
-        self,
-        patch_is_valid_interface,
-    ):
-
-        with self.assertLogs() as captured:
-            self.harness.update_config({"orc8r-domain": "invalid"})
-
-        self.assertEqual("Invalid Orchestrator domain", captured.records[0].getMessage())
-
-        self.assertEqual(
-            self.harness.charm.unit.status,
-            BlockedStatus("Configuration is invalid. Check logs for details"),
+            action_event.set_results.call_args,
+            call({"post-install-checks-output": successful_output}),
         )

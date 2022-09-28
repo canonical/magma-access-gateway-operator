@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import subprocess
-from typing import List
+from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
 from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
@@ -24,12 +24,19 @@ logger = logging.getLogger(__name__)
 class MagmaAccessGatewayOperatorCharm(CharmBase):
     """Charm the service."""
 
+    HARDWARE_ID_LABEL = "Hardware ID"
+    CHALLENGE_KEY_LABEL = "Challenge key"
+
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
+
+        self.framework.observe(
+            self.on.get_access_gateway_secrets_action, self._on_get_access_gateway_secrets
+        )
         self.framework.observe(
             self.on.post_install_checks_action, self._on_post_install_checks_action
         )
@@ -50,9 +57,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         self.unit.status = MaintenanceStatus("Installing AGW")
         self.install_magma_access_gateway()
-        orc8r_domain = self.model.config.get("orc8r-domain")
-        root_ca_path = self.model.config.get("root-ca-path")
-        self.configure_magma_access_gateway(orc8r_domain, root_ca_path)  # type: ignore[arg-type]
 
     def _on_start(self, event: StartEvent):
         """Triggered on start event.
@@ -63,26 +67,34 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
-        magma_service = subprocess.run(
-            ["systemctl", "is-active", "magma@magmad"],
-            stdout=subprocess.PIPE,
-        )
-        if magma_service.returncode != 0:
+        if not self._magma_service_is_running:
             event.defer()
             return
         self.unit.status = ActiveStatus()
 
-    @staticmethod
-    def install_magma_access_gateway_snap() -> None:
-        """Installs Magma Access Gateway snap.
+    def _on_get_access_gateway_secrets(self, event: ActionEvent) -> None:
+        """Triggered on get-access-gateway-secrets action call.
 
-        Returns:
-            None
+        Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with
+        the Orchestrator.
         """
-        subprocess.run(
-            ["snap", "install", "magma-access-gateway", "--classic", "--edge"],
-            stdout=subprocess.PIPE,
-        )
+        if not self._magma_service_is_running:
+            event.fail("Magma is not running! Please start Magma and try again.")
+            return
+        try:
+            hardware_id, challenge_key = self._get_magma_secrets
+            event.set_results(
+                {
+                    "hardware-id": hardware_id,
+                    "challange-key": challenge_key,
+                }
+            )
+        except (subprocess.CalledProcessError, IndexError, ValueError):
+            event.fail("Failed to get Magma Access Gateway secrets!")
+            return
+        except Exception as e:
+            event.fail(str(e))
+            return
 
     def _on_post_install_checks_action(self, event: ActionEvent) -> None:
         """Triggered on post install checks action.
@@ -96,14 +108,37 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         if not self._magma_service_is_running:
             event.fail("Magma is not running! Please start Magma and try again.")
             return
+
         command = ["magma-access-gateway.post-install"]
+        successful_output = "Magma AGW post-installation checks finished successfully."
+        checks_failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
         try:
-            post_install_checks_output = subprocess.check_output(command).decode("utf-8").rstrip()
-            event.set_results({"post-install-checks-output": post_install_checks_output})
+            output = subprocess.check_output(command).decode("utf-8").rstrip()
+            event.set_results(
+                {
+                    "post-install-checks-output": successful_output
+                    if successful_output in output
+                    else checks_failed_msg
+                }
+            )
         except (subprocess.CalledProcessError, IndexError, ValueError):
-            event.fail("Failed to run jpost-install checks.")
+            event.fail("Failed to run post-install checks.")
+            return
         except Exception as e:
             event.fail(str(e))
+            return
+
+    @staticmethod
+    def install_magma_access_gateway_snap() -> None:
+        """Installs Magma Access Gateway snap.
+
+        Returns:
+            None
+        """
+        subprocess.run(
+            ["snap", "install", "magma-access-gateway", "--classic", "--edge"],
+            stdout=subprocess.PIPE,
+        )
 
     def install_magma_access_gateway(self) -> None:
         """Installs Magma access gateway on the host.
@@ -155,33 +190,29 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         if not self._are_valid_dns(self.model.config["dns"]):
             logger.warning("Invalid DNS configuration")
             valid = False
-        if not self._is_valid_rootca_pem_path:
-            logger.warning("Invalid RootCA certificate")
-            valid = False
-        if not self._is_valid_orc8r_domain(self.model.config["orc8r-domain"]):
-            logger.warning("Invalid Orchestrator domain")
-            valid = False
         return valid
 
+    # TODO: Use when relation with Or8cr is ready.
     @staticmethod
-    def _is_valid_orc8r_domain(orc8r_domain: str) -> bool:
-        """Validates Orchestrator domain.
+    def _is_valid_domain(domain: str) -> bool:
+        """Validates given domain.
 
         Args:
-            orc8r_domain (str): Orchestrator domain.
+            domain (str): domain.
 
         Returns:
-            bool: True if Orchestrator domain is valid, False otherwise.
+            bool: True if domain is valid, False otherwise.
         """
-        if not orc8r_domain:
+        if not domain:
             return False
         if re.match(
             "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]",  # noqa: W605, E501
-            orc8r_domain,
+            domain,
         ):
             return True
         return False
 
+    # TODO: Use when relation with Or8cr is ready.
     @staticmethod
     def _is_valid_rootca_pem_path(rootca_pem_path: str) -> bool:
         """Validate that provided string is a valid path to rootCA.pem file."""
@@ -343,8 +374,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             List of arguments for install command
         """
         config = dict(copy.deepcopy(self.model.config))
-        exclude_arguments = ["orc8r-domain", "root-ca-path"]
-        [config.pop(argument) for argument in exclude_arguments]
         if config.pop("skip-networking"):
             return ["--skip-networking"]
         arguments = ["--dns"]
@@ -361,6 +390,25 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             stdout=subprocess.PIPE,
         )
         return magma_service.returncode == 0
+
+    @property
+    def _get_magma_secrets(self) -> Tuple[Optional[str], Optional[str]]:
+        """Gets Access Gateway's Hardware ID and Challenge key.
+
+        Hardware ID and Challenge key are available through the `show_gateway_info` script
+        provided by the Access Gateway. This method filers out required values from the script's
+        output.
+
+        Returns:
+            str: Hardware ID
+            str: Challenge key
+        """
+        gateway_info = subprocess.check_output(["show_gateway_info.py"]).decode().split("\n")
+        gateway_info = list(filter(None, gateway_info))
+        gateway_info = list(filter(lambda x: (not re.search("^-(-*)", x)), gateway_info))
+        hardware_id = gateway_info[gateway_info.index(self.HARDWARE_ID_LABEL) + 1]
+        challenge_key = gateway_info[gateway_info.index(self.CHALLENGE_KEY_LABEL) + 1]
+        return hardware_id, challenge_key
 
 
 if __name__ == "__main__":
