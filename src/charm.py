@@ -8,7 +8,6 @@ import copy
 import ipaddress
 import json
 import logging
-import os
 import re
 import subprocess
 from typing import List, Optional, Tuple
@@ -128,7 +127,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
                     else checks_failed_msg
                 }
             )
-        except (subprocess.CalledProcessError, IndexError, ValueError):
+        except (subprocess.CalledProcessError):
             event.fail("Failed to run post-install checks.")
             return
         except Exception as e:
@@ -207,35 +206,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             logger.warning("Invalid DNS configuration")
             valid = False
         return valid
-
-    # TODO: Use when relation with Or8cr is ready.
-    @staticmethod
-    def _is_valid_domain(domain: str) -> bool:
-        """Validates given domain.
-
-        Args:
-            domain (str): domain.
-
-        Returns:
-            bool: True if domain is valid, False otherwise.
-        """
-        if not domain:
-            return False
-        if re.match(
-            "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]",  # noqa: W605, E501
-            domain,
-        ):
-            return True
-        return False
-
-    # TODO: Use when relation with Or8cr is ready.
-    @staticmethod
-    def _is_valid_rootca_pem_path(rootca_pem_path: str) -> bool:
-        """Validate that provided string is a valid path to rootCA.pem file."""
-        try:
-            return os.path.isfile(rootca_pem_path) if rootca_pem_path else True
-        except ValueError:
-            return False
 
     def _is_valid_interface(self, interface_name: str, new_interface_name: str) -> bool:
         """Validates a network interface name.

@@ -888,15 +888,13 @@ Challenge key
 
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
-        patch_subprocess_check_output.assert_has_calls(
-            [
-                call(["magma-access-gateway.post-install"]),
-            ]
+        patch_subprocess_check_output.assert_called_once_with(
+            ["magma-access-gateway.post-install"]
         )
 
     @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def test_given_magma_service_is_running_and_agw_not_configured_when_post_install_checks_action_then_checks_fails_and_redirects_user_to_journalctl_logs(  # noqa: E501
+    def test_given_post_install_checks_output_doesnt_contain_successful_output_message_when_post_install_checks_action_then_error_message_is_set_in_action_results(  # noqa: E501
         self, patch_subprocess_run, patch_check_output
     ):
         patch_subprocess_run.return_value = Mock(returncode=0)
@@ -913,7 +911,7 @@ Challenge key
 
     @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def test_given_magma_service_is_running_and_agw_propperly_configured_when_post_install_checks_action_then_checks_succeeds(  # noqa: E501
+    def test_given_post_install_checks_output_contains_successful_output_message_when_post_install_checks_action_then_successful_output_message_is_set_in_action_results(  # noqa: E501
         self, patch_subprocess_run, patch_check_output
     ):
         patch_subprocess_run.return_value = Mock(returncode=0)
