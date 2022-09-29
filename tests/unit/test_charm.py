@@ -809,7 +809,6 @@ Challenge key
             call("Failed to get Magma Access Gateway secrets!"),
         )
 
-    # TODO: post install tests
     @patch("subprocess.check_output")
     @patch("subprocess.run")
     def test_given_magma_service_is_not_running_when_post_install_checks_action_then_checks_not_start(  # noqa: E501
