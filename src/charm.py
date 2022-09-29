@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import subprocess
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
@@ -17,7 +18,15 @@ from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
+from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
+    OrchestratorAvailableEvent,
+    OrchestratorRequires,
+)
+
 logger = logging.getLogger(__name__)
+
+CERT_DIR = "/var/opt/magma/tmp/certs"
+CONFIG_DIR = "/var/opt/magma/configs"
 
 
 class MagmaAccessGatewayOperatorCharm(CharmBase):
@@ -29,6 +38,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
+        self.orchestrator_requirer = OrchestratorRequires(self, "magma-orchestrator")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
@@ -38,6 +48,11 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         )
         self.framework.observe(
             self.on.post_install_checks_action, self._on_post_install_checks_action
+        )
+
+        self.framework.observe(
+            self.orchestrator_requirer.on.orchestrator_available,
+            self._on_orchestrator_available,
         )
 
     def _on_install(self, event: InstallEvent) -> None:
@@ -129,6 +144,17 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         except Exception as e:
             event.fail(str(e))
             return
+
+    def _on_orchestrator_available(self, event: OrchestratorAvailableEvent):
+        """Triggered when a related orchestrator is made available.
+
+        The AGW will be configured to connect to the orchestrator with the data from
+        the event. Services will then be restarted.
+        """
+        if self._install_configurations(event):
+            self.unit.status = MaintenanceStatus("Restarting Access Gateway to apply changes")
+            self._restart_magma()
+            self.unit.status = ActiveStatus()
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
@@ -400,6 +426,77 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             stdout=subprocess.PIPE,
         )
         return not magma_service.returncode
+
+    def _install_configurations(self, event: OrchestratorAvailableEvent) -> bool:
+        """Install or update configuration files.
+
+        Returns:
+            True if any changes were applied
+        """
+        return any(
+            [
+                self._install_root_ca_certificate(event.root_ca_certificate),
+                self._install_agw_config(event),
+            ]
+        )
+
+    @staticmethod
+    def _install_root_ca_certificate(root_ca_certificate: bytes) -> bool:
+        """Install root ca certificate or update it.
+
+        Returns:
+            True if the root ca certificate was written
+        """
+        cert_dir = Path(CERT_DIR)
+        if not cert_dir.exists():
+            cert_dir.mkdir()
+        root_ca_file = cert_dir / "rootCA.pem"
+        if root_ca_file.exists():
+            if root_ca_file.read_bytes() == root_ca_certificate:
+                return False
+        root_ca_file.write_bytes(root_ca_certificate)
+        return True
+
+    def _install_agw_config(self, event: OrchestratorAvailableEvent) -> bool:
+        """Install AGW configuration file or update it.
+
+        Returns:
+            True if the configuration file was written
+        """
+        config = self._generate_config(event)
+        config_dir = Path(CONFIG_DIR)
+        if not config_dir.exists():
+            config_dir.mkdir()
+        config_file = config_dir / "control_proxy.yml"
+        if config_file.exists():
+            if config_file.read_text() == config:
+                return False
+        config_file.write_text(config)
+        return True
+
+    @staticmethod
+    def _generate_config(event: OrchestratorAvailableEvent) -> str:
+        return (
+            f"cloud_address: {event.orchestrator_address}\n"
+            f"cloud_port: {event.orchestrator_port}\n"
+            f"bootstrap_address: {event.bootstrapper_address}\n"
+            f"bootstrap_port: {event.bootstrapper_port}\n"
+            f"fluentd_address: {event.fluentd_address}\n"
+            f"fluentd_port: {event.fluentd_port}\n"
+            "\n"
+            f"rootca_cert: {CERT_DIR}/rootCA.pem\n"
+        )
+
+    @staticmethod
+    def _restart_magma() -> None:
+        subprocess.run(
+            ["service", "magma@*", "stop"],
+            stdout=subprocess.PIPE,
+        )
+        subprocess.run(
+            ["service", "magma@magmad", "start"],
+            stdout=subprocess.PIPE,
+        )
 
 
 if __name__ == "__main__":
