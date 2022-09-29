@@ -927,6 +927,7 @@ Challenge key
             action_event.set_results.call_args,
             call({"post-install-checks-output": successful_output}),
         )
+
     @patch("subprocess.run")
     def test_given_magma_service_enabled_when_install_then_nothing_done(
         self, patch_subprocess_run
