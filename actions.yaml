@@ -1,6 +1,9 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+post-install-checks:
+  description: |
+    Runs post-install checks. It will only succeed when attached with an Orchestrator.
 get-access-gateway-secrets:
   description: |
     Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with 

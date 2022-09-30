@@ -36,6 +36,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(
             self.on.get_access_gateway_secrets_action, self._on_get_access_gateway_secrets
         )
+        self.framework.observe(
+            self.on.post_install_checks_action, self._on_post_install_checks_action
+        )
 
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
@@ -94,6 +97,34 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             )
         except (subprocess.CalledProcessError, IndexError, ValueError):
             event.fail("Failed to get Magma Access Gateway secrets!")
+            return
+        except Exception as e:
+            event.fail(str(e))
+            return
+
+    def _on_post_install_checks_action(self, event: ActionEvent) -> None:
+        """Triggered on post install checks action.
+
+        Args:
+            event: Juju event (ActionEvent)
+
+        Returns:
+            None
+        """
+        command = ["magma-access-gateway.post-install"]
+        successful_msg = "Magma AGW post-installation checks finished successfully."
+        failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
+        try:
+            post_install_checks = subprocess.run(command, stdout=subprocess.PIPE)
+            event.set_results(
+                {
+                    "post-install-checks-output": successful_msg
+                    if (post_install_checks.returncode == 0)
+                    else failed_msg
+                }
+            )
+        except (subprocess.CalledProcessError):
+            event.fail("Failed to run post-install checks.")
             return
         except Exception as e:
             event.fail(str(e))
@@ -340,9 +371,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             ["systemctl", "is-active", "magma@magmad"],
             stdout=subprocess.PIPE,
         )
-        if magma_service.returncode != 0:
-            return False
-        return True
+        return magma_service.returncode == 0
 
     @property
     def _get_magma_secrets(self) -> Tuple[Optional[str], Optional[str]]:

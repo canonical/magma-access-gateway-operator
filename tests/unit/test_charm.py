@@ -71,6 +71,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
             ]
         )
+
         self.assertEqual(
             self.harness.charm.unit.status,
             MaintenanceStatus("Rebooting to apply changes"),
@@ -857,6 +858,36 @@ Challenge key
         self.assertEqual(
             action_event.fail.call_args,
             call("Failed to get Magma Access Gateway secrets!"),
+        )
+
+    @patch("subprocess.run")
+    def test_given_not_successful_post_install_checks_when_post_install_checks_action_then_error_message_is_set_in_action_results(  # noqa: E501
+        self, patch_subprocess_run
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=1)
+        failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
+        action_event = Mock()
+
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        self.assertEqual(
+            action_event.set_results.call_args,
+            call({"post-install-checks-output": failed_msg}),
+        )
+
+    @patch("subprocess.run")
+    def test_given_successful_post_install_checks_when_post_install_checks_action_then_success_message_is_set_in_action_results(  # noqa: E501
+        self, patch_subprocess_run
+    ):
+        patch_subprocess_run.return_value = Mock(returncode=0)
+        successful_msg = "Magma AGW post-installation checks finished successfully."
+        action_event = Mock()
+
+        self.harness.charm._on_post_install_checks_action(event=action_event)
+
+        self.assertEqual(
+            action_event.set_results.call_args,
+            call({"post-install-checks-output": successful_msg}),
         )
 
     @patch("subprocess.run")
