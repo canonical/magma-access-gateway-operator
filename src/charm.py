@@ -111,20 +111,16 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
-        if not self._magma_service_is_running:
-            event.fail("Magma is not running! Please start Magma and try again.")
-            return
-
         command = ["magma-access-gateway.post-install"]
-        successful_output = "Magma AGW post-installation checks finished successfully."
-        checks_failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
+        successful_msg = "Magma AGW post-installation checks finished successfully."
+        failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
         try:
-            output = subprocess.check_output(command).decode("utf-8").rstrip()
+            post_install_checks = subprocess.run(command, stdout=subprocess.PIPE)
             event.set_results(
                 {
-                    "post-install-checks-output": successful_output
-                    if successful_output in output
-                    else checks_failed_msg
+                    "post-install-checks-output": successful_msg
+                    if (post_install_checks.returncode == 0)
+                    else failed_msg
                 }
             )
         except (subprocess.CalledProcessError):

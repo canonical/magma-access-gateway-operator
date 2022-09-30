@@ -860,70 +860,34 @@ Challenge key
             call("Failed to get Magma Access Gateway secrets!"),
         )
 
-    @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def test_given_magma_service_is_not_running_when_post_install_checks_action_then_checks_not_start(  # noqa: E501
-        self, patch_subprocess_run, patch_check_output
+    def test_given_not_successful_post_install_checks_when_post_install_checks_action_then_error_message_is_set_in_action_results(  # noqa: E501
+        self, patch_subprocess_run
     ):
         patch_subprocess_run.return_value = Mock(returncode=1)
-        action_event = Mock()
-
-        self.harness.charm._on_post_install_checks_action(event=action_event)
-
-        patch_check_output.assert_not_called()
-        self.assertEqual(
-            action_event.fail.call_args,
-            call("Magma is not running! Please start Magma and try again."),
-        )
-
-    @patch("subprocess.run")
-    @patch("subprocess.check_output")
-    def test_given_magma_service_is_running_when_post_install_checks_action_then_checks_start(
-        self,
-        patch_subprocess_check_output,
-        patch_subprocess_run,
-    ):
-        action_event = Mock()
-        patch_subprocess_run.return_value = Mock(returncode=0)
-
-        self.harness.charm._on_post_install_checks_action(event=action_event)
-
-        patch_subprocess_check_output.assert_called_once_with(
-            ["magma-access-gateway.post-install"]
-        )
-
-    @patch("subprocess.check_output")
-    @patch("subprocess.run")
-    def test_given_post_install_checks_output_doesnt_contain_successful_output_message_when_post_install_checks_action_then_error_message_is_set_in_action_results(  # noqa: E501
-        self, patch_subprocess_run, patch_check_output
-    ):
-        patch_subprocess_run.return_value = Mock(returncode=0)
-        patch_check_output.return_value = "dummy post-install check output".encode("utf-8")
-        checks_failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
+        failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
         action_event = Mock()
 
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
         self.assertEqual(
             action_event.set_results.call_args,
-            call({"post-install-checks-output": checks_failed_msg}),
+            call({"post-install-checks-output": failed_msg}),
         )
 
-    @patch("subprocess.check_output")
     @patch("subprocess.run")
-    def test_given_post_install_checks_output_contains_successful_output_message_when_post_install_checks_action_then_successful_output_message_is_set_in_action_results(  # noqa: E501
-        self, patch_subprocess_run, patch_check_output
+    def test_given_successful_post_install_checks_when_post_install_checks_action_then_success_message_is_set_in_action_results(  # noqa: E501
+        self, patch_subprocess_run
     ):
         patch_subprocess_run.return_value = Mock(returncode=0)
-        successful_output = "Magma AGW post-installation checks finished successfully."
-        patch_check_output.return_value = successful_output.encode("utf-8")
+        successful_msg = "Magma AGW post-installation checks finished successfully."
         action_event = Mock()
 
         self.harness.charm._on_post_install_checks_action(event=action_event)
 
         self.assertEqual(
             action_event.set_results.call_args,
-            call({"post-install-checks-output": successful_output}),
+            call({"post-install-checks-output": successful_msg}),
         )
 
     @patch("subprocess.run")
