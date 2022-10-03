@@ -1,6 +1,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import pathlib
+import tempfile
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -907,3 +909,86 @@ Challenge key
                 ),
             ]
         )
+
+    @patch("charm.Path")
+    @patch("subprocess.run")
+    def test_when_orchestrator_available_event_then_configuration_is_installed(
+        self, patch_subprocess_run, patch_path
+    ):
+        event = Mock(
+            root_ca_certificate="root_ca_certificate_content",
+            orchestrator_address="orchestrator_address",
+            orchestrator_port="orchestrator_port",
+            bootstrapper_address="bootstrapper_address",
+            bootstrapper_port="bootstrapper_port",
+            fluentd_address="fluentd_address",
+            fluentd_port="fluentd_port",
+        )
+        self.harness.charm._on_orchestrator_available(event)
+
+        patch_path.assert_has_calls(
+            [
+                call("/var/opt/magma/tmp/certs/rootCA.pem"),
+                call().write_text("root_ca_certificate_content"),
+                call("/var/opt/magma/configs/control_proxy.yml"),
+                call().write_text(
+                    "cloud_address: orchestrator_address\n"
+                    "cloud_port: orchestrator_port\n"
+                    "bootstrap_address: bootstrapper_address\n"
+                    "bootstrap_port: bootstrapper_port\n"
+                    "fluentd_address: fluentd_address\n"
+                    "fluentd_port: fluentd_port\n"
+                    "\n"
+                    "rootca_cert: /var/opt/magma/tmp/certs/rootCA.pem\n"
+                ),
+            ],
+            any_order=True,
+        )
+        patch_subprocess_run.assert_has_calls(
+            [
+                call(
+                    ["service", "magma@*", "stop"],
+                    stdout=-1,
+                ),
+                call(
+                    ["service", "magma@magmad", "start"],
+                    stdout=-1,
+                ),
+            ]
+        )
+
+    def test_given_directory_does_not_exist_when_install_file_then_directory_is_created(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "does_not_exist" / "file.txt"
+
+            self.harness.charm._install_file(file, "content")
+
+            self.assertTrue(file.parent.exists())
+
+    def test_given_file_exists_and_already_has_content_when_install_file_then_return_false(self):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "exists" / "file.txt"
+            file.parent.mkdir()
+            file.write_text("content")
+
+            self.assertFalse(self.harness.charm._install_file(file, "content"))
+
+    def test_given_file_exists_without_content_when_install_file_then_return_true_and_content_is_written(  # noqa: E501
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "exists" / "file.txt"
+            file.parent.mkdir()
+            file.write_text("")
+
+            self.assertTrue(self.harness.charm._install_file(file, "content"))
+            self.assertEqual(file.read_text(), "content")
+
+    def test_given_file_does_not_exist_when_install_file_then_return_true_and_content_is_written(  # noqa: E501
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            file = pathlib.Path(directory) / "exists" / "file.txt"
+
+            self.assertTrue(self.harness.charm._install_file(file, "content"))
+            self.assertEqual(file.read_text(), "content")

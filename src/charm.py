@@ -25,8 +25,8 @@ from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface imp
 
 logger = logging.getLogger(__name__)
 
-CERT_DIR = "/var/opt/magma/tmp/certs"
-CONFIG_DIR = "/var/opt/magma/configs"
+ROOT_CA_PATH = "/var/opt/magma/tmp/certs/rootCA.pem"
+CONFIG_PATH = "/var/opt/magma/configs/control_proxy.yml"
 
 
 class MagmaAccessGatewayOperatorCharm(CharmBase):
@@ -154,7 +154,10 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         if self._install_configurations(event):
             self.unit.status = MaintenanceStatus("Restarting Access Gateway to apply changes")
             self._restart_magma()
-            self.unit.status = ActiveStatus()
+        if not self._magma_service_is_running:
+            event.defer()
+            return
+        self.unit.status = ActiveStatus()
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
@@ -187,28 +190,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """Sends the command to reboot the machine in 1 minute."""
         subprocess.run(
             ["shutdown", "--reboot", "+1"],
-            stdout=subprocess.PIPE,
-        )
-
-    @staticmethod
-    def configure_magma_access_gateway(orc8r_domain: str, root_ca_path: str) -> None:
-        """Configures Magma Access Gateway to connect to an Orchestrator.
-
-        Args:
-            orc8r_domain (str): Orchestrator domain.
-            root_ca_path (str): Path to Orchestrator root CA certificate.
-
-        Returns:
-            None
-        """
-        subprocess.run(
-            [
-                "magma-access-gateway.configure",
-                "--domain",
-                orc8r_domain,
-                "--root-ca-pem-path",
-                root_ca_path,
-            ],
             stdout=subprocess.PIPE,
         )
 
@@ -433,45 +414,30 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             True if any changes were applied
         """
+        config = self._generate_config(event)
         return any(
             [
-                self._install_root_ca_certificate(event.root_ca_certificate),
-                self._install_agw_config(event),
+                self._install_file(Path(ROOT_CA_PATH), event.root_ca_certificate),
+                self._install_file(Path(CONFIG_PATH), config),
             ]
         )
 
     @staticmethod
-    def _install_root_ca_certificate(root_ca_certificate: bytes) -> bool:
-        """Install root ca certificate or update it.
+    def _install_file(file: Path, content: str) -> bool:
+        """Install file with provided text content.
+
+        Args:
+            file: Path object to write to
+            content: Text content to write to the file
 
         Returns:
-            True if the root ca certificate was written
+            True if the file was written to
         """
-        cert_dir = Path(CERT_DIR)
-        if not cert_dir.exists():
-            cert_dir.mkdir()
-        root_ca_file = cert_dir / "rootCA.pem"
-        if root_ca_file.exists():
-            if root_ca_file.read_bytes() == root_ca_certificate:
-                return False
-        root_ca_file.write_bytes(root_ca_certificate)
-        return True
-
-    def _install_agw_config(self, event: OrchestratorAvailableEvent) -> bool:
-        """Install AGW configuration file or update it.
-
-        Returns:
-            True if the configuration file was written
-        """
-        config = self._generate_config(event)
-        config_dir = Path(CONFIG_DIR)
-        if not config_dir.exists():
-            config_dir.mkdir()
-        config_file = config_dir / "control_proxy.yml"
-        if config_file.exists():
-            if config_file.read_text() == config:
-                return False
-        config_file.write_text(config)
+        if not file.parent.exists():
+            file.parent.mkdir()
+        elif file.exists() and file.read_text() == content:
+            return False
+        file.write_text(content)
         return True
 
     @staticmethod
@@ -484,7 +450,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             f"fluentd_address: {event.fluentd_address}\n"
             f"fluentd_port: {event.fluentd_port}\n"
             "\n"
-            f"rootca_cert: {CERT_DIR}/rootCA.pem\n"
+            f"rootca_cert: {ROOT_CA_PATH}\n"
         )
 
     @staticmethod
