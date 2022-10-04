@@ -3,6 +3,7 @@
 
 import pathlib
 import tempfile
+import typing
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -19,6 +20,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness = testing.Harness(MagmaAccessGatewayOperatorCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
+        self.charm = typing.cast(MagmaAccessGatewayOperatorCharm, self.harness.charm)
 
     @patch("subprocess.run")
     def test_given_no_config_provided_when_install_then_snap_is_installed_and_status_is_blocked(
@@ -27,7 +29,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         event = Mock()
         patch_subprocess_run.side_effect = [Mock(returncode=1), Mock(returncode=0)]
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -38,7 +40,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual("sgi interface name is required", captured.records[0].getMessage())
@@ -56,8 +58,8 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             Mock(returncode=0),
             Mock(returncode=0),
         ]
-        self.harness.update_config({"skip-networking": "True"})
-        self.harness.charm._on_install(event=event)
+        self.harness.update_config({"skip-networking": True})
+        self.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -75,7 +77,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         )
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             MaintenanceStatus("Rebooting to apply changes"),
         )
 
@@ -88,7 +90,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             Mock(returncode=0),
             Mock(returncode=1),
         ]
-        self.harness.update_config({"skip-networking": "True"})
+        self.harness.update_config({"skip-networking": True})
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -103,7 +105,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Installation script failed. See logs for details"),
         )
 
@@ -116,10 +118,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
         self.harness.update_config({"sgi": "nosuchinterface", "s1": "bananaphone"})
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual("nosuchinterface interface not found", captured.records[0].getMessage())
@@ -141,10 +143,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -168,10 +170,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -195,10 +197,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -222,10 +224,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -250,10 +252,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -278,10 +280,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -306,10 +308,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -334,10 +336,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -368,10 +370,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -402,10 +404,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -436,10 +438,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -463,10 +465,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -490,10 +492,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -522,10 +524,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -549,10 +551,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -576,10 +578,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -603,10 +605,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             }
         )
         with self.assertLogs() as captured:
-            self.harness.charm._on_install(event=event)
+            self.charm._on_install(event=event)
 
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             BlockedStatus("Configuration is invalid. Check logs for details"),
         )
         self.assertEqual(
@@ -629,7 +631,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             Mock(returncode=0),
         ]
         self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.harness.charm._on_start(event=event)
+        self.charm._on_start(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -656,7 +658,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             ActiveStatus(),
         )
 
@@ -686,7 +688,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                 "s1-ipv6-address": "2002:0db8:85a3:0000:0000:8a2e:0370:7334/64",
             }
         )
-        self.harness.charm._on_install(event=event)
+        self.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -725,7 +727,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             MaintenanceStatus("Rebooting to apply changes"),
         )
 
@@ -735,11 +737,11 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self, patch_interfaces, patch_subprocess_run
     ):
         event = Mock()
-        expected_status = self.harness.charm.unit.status
+        expected_status = self.charm.unit.status
         completed_process = Mock(returncode=1)
         patch_subprocess_run.return_value = completed_process
 
-        self.harness.charm._on_start(event=event)
+        self.charm._on_start(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -750,7 +752,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             expected_status,
         )
 
@@ -763,7 +765,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         completed_process = Mock(returncode=0)
         patch_subprocess_run.return_value = completed_process
 
-        self.harness.charm._on_start(event=event)
+        self.charm._on_start(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -774,7 +776,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            self.harness.charm.unit.status,
+            self.charm.unit.status,
             ActiveStatus(),
         )
 
@@ -799,7 +801,7 @@ Challenge key
             "utf-8"
         )
 
-        self.harness.charm._on_get_access_gateway_secrets(action_event)
+        self.charm._on_get_access_gateway_secrets(action_event)
 
         self.assertEqual(
             action_event.set_results.call_args,
@@ -814,7 +816,7 @@ Challenge key
         patch_subprocess_run.return_value = completed_process
         action_event = Mock()
 
-        self.harness.charm._on_get_access_gateway_secrets(action_event)
+        self.charm._on_get_access_gateway_secrets(action_event)
 
         self.assertEqual(
             action_event.fail.call_args,
@@ -831,7 +833,7 @@ Challenge key
         action_event = Mock()
         patched_check_output.return_value = "".encode("utf-8")
 
-        self.harness.charm._on_get_access_gateway_secrets(action_event)
+        self.charm._on_get_access_gateway_secrets(action_event)
 
         self.assertEqual(
             action_event.fail.call_args,
@@ -855,7 +857,7 @@ Challenge key
             "utf-8"
         )
 
-        self.harness.charm._on_get_access_gateway_secrets(action_event)
+        self.charm._on_get_access_gateway_secrets(action_event)
 
         self.assertEqual(
             action_event.fail.call_args,
@@ -870,7 +872,7 @@ Challenge key
         failed_msg = "Post-installation checks failed. For more information, please check journalctl logs."  # noqa: E501
         action_event = Mock()
 
-        self.harness.charm._on_post_install_checks_action(event=action_event)
+        self.charm._on_post_install_checks_action(event=action_event)
 
         self.assertEqual(
             action_event.set_results.call_args,
@@ -885,7 +887,7 @@ Challenge key
         successful_msg = "Magma AGW post-installation checks finished successfully."
         action_event = Mock()
 
-        self.harness.charm._on_post_install_checks_action(event=action_event)
+        self.charm._on_post_install_checks_action(event=action_event)
 
         self.assertEqual(
             action_event.set_results.call_args,
@@ -899,7 +901,7 @@ Challenge key
         event = Mock()
         patch_subprocess_run.side_effect = [Mock(returncode=0)]
 
-        self.harness.charm._on_install(event=event)
+        self.charm._on_install(event=event)
 
         patch_subprocess_run.assert_has_calls(
             [

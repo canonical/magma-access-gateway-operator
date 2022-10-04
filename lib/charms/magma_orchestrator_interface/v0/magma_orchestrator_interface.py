@@ -112,7 +112,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 
 logger = logging.getLogger(__name__)
@@ -266,7 +266,7 @@ class OrchestratorRequires(Object):
         remote_app_relation_data = relation.data[relation.app]
         if not self._relation_data_is_valid(dict(remote_app_relation_data)):
             logger.warning(
-                f"Provider relation data did not pass JSON Schema validation: "
+                f"Provider relation data did not pass JSON Schema validation: "  # type: ignore[index]  # noqa: E501,W505
                 f"{event.relation.data[event.app]}"
             )
             return

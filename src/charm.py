@@ -4,7 +4,6 @@
 
 """Machine Charm for Magma's Access Gateway."""
 
-import copy
 import ipaddress
 import json
 import logging
@@ -380,7 +379,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             List of arguments for install command
         """
-        config = dict(copy.deepcopy(self.model.config))
+        config = dict(self.model.config)
         if config.pop("skip-networking"):
             return ["--no-reboot", "--skip-networking"]
         arguments = ["--no-reboot", "--dns"]
