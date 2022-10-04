@@ -29,6 +29,24 @@ ROOT_CA_PATH = "/var/opt/magma/tmp/certs/rootCA.pem"
 CONFIG_PATH = "/var/opt/magma/configs/control_proxy.yml"
 
 
+def install_file(file: Path, content: str) -> bool:
+    """Install file with provided text content.
+
+    Args:
+        file: Path object to write to
+        content: Text content to write to the file
+
+    Returns:
+        True if the file was written to
+    """
+    if not file.parent.exists():
+        file.parent.mkdir()
+    elif file.exists() and file.read_text() == content:
+        return False
+    file.write_text(content)
+    return True
+
+
 class MagmaAccessGatewayOperatorCharm(CharmBase):
     """Charm the service."""
 
@@ -414,41 +432,37 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             True if any changes were applied
         """
-        config = self._generate_config(event)
+        config = self._generate_config(
+            orchestrator_address=event.orchestrator_address,
+            orchestrator_port=event.orchestrator_port,
+            bootstrapper_address=event.bootstrapper_address,
+            bootstrapper_port=event.bootstrapper_port,
+            fluentd_address=event.fluentd_address,
+            fluentd_port=event.fluentd_port,
+        )
         return any(
             [
-                self._install_file(Path(ROOT_CA_PATH), event.root_ca_certificate),
-                self._install_file(Path(CONFIG_PATH), config),
+                install_file(Path(ROOT_CA_PATH), event.root_ca_certificate),
+                install_file(Path(CONFIG_PATH), config),
             ]
         )
 
     @staticmethod
-    def _install_file(file: Path, content: str) -> bool:
-        """Install file with provided text content.
-
-        Args:
-            file: Path object to write to
-            content: Text content to write to the file
-
-        Returns:
-            True if the file was written to
-        """
-        if not file.parent.exists():
-            file.parent.mkdir()
-        elif file.exists() and file.read_text() == content:
-            return False
-        file.write_text(content)
-        return True
-
-    @staticmethod
-    def _generate_config(event: OrchestratorAvailableEvent) -> str:
+    def _generate_config(
+        orchestrator_address: str,
+        orchestrator_port: int,
+        bootstrapper_address: str,
+        bootstrapper_port: int,
+        fluentd_address: str,
+        fluentd_port: int,
+    ) -> str:
         return (
-            f"cloud_address: {event.orchestrator_address}\n"
-            f"cloud_port: {event.orchestrator_port}\n"
-            f"bootstrap_address: {event.bootstrapper_address}\n"
-            f"bootstrap_port: {event.bootstrapper_port}\n"
-            f"fluentd_address: {event.fluentd_address}\n"
-            f"fluentd_port: {event.fluentd_port}\n"
+            f"cloud_address: {orchestrator_address}\n"
+            f"cloud_port: {orchestrator_port}\n"
+            f"bootstrap_address: {bootstrapper_address}\n"
+            f"bootstrap_port: {bootstrapper_port}\n"
+            f"fluentd_address: {fluentd_address}\n"
+            f"fluentd_port: {fluentd_port}\n"
             "\n"
             f"rootca_cert: {ROOT_CA_PATH}\n"
         )

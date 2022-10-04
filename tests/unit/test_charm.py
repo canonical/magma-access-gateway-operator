@@ -9,7 +9,7 @@ from unittest.mock import Mock, call, patch
 from ops import testing
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from charm import MagmaAccessGatewayOperatorCharm
+from charm import MagmaAccessGatewayOperatorCharm, install_file
 
 testing.SIMULATE_CAN_CONNECT = True
 
@@ -915,16 +915,21 @@ Challenge key
     def test_when_orchestrator_available_event_then_configuration_is_installed(
         self, patch_subprocess_run, patch_path
     ):
-        event = Mock(
-            root_ca_certificate="root_ca_certificate_content",
-            orchestrator_address="orchestrator_address",
-            orchestrator_port="orchestrator_port",
-            bootstrapper_address="bootstrapper_address",
-            bootstrapper_port="bootstrapper_port",
-            fluentd_address="fluentd_address",
-            fluentd_port="fluentd_port",
+        relation_id = self.harness.add_relation("magma-orchestrator", "orc8r-nginx-operator")
+        self.harness.add_relation_unit(relation_id, "orc8r-nginx-operator/0")
+        self.harness.update_relation_data(
+            relation_id,
+            "orc8r-nginx-operator",
+            {
+                "root_ca_certificate": "root_ca_certificate_content",
+                "orchestrator_address": "orchestrator.com",
+                "orchestrator_port": "42",
+                "bootstrapper_address": "bootstrapper.com",
+                "bootstrapper_port": "42",
+                "fluentd_address": "fluentd.com",
+                "fluentd_port": "42",
+            },
         )
-        self.harness.charm._on_orchestrator_available(event)
 
         patch_path.assert_has_calls(
             [
@@ -932,12 +937,12 @@ Challenge key
                 call().write_text("root_ca_certificate_content"),
                 call("/var/opt/magma/configs/control_proxy.yml"),
                 call().write_text(
-                    "cloud_address: orchestrator_address\n"
-                    "cloud_port: orchestrator_port\n"
-                    "bootstrap_address: bootstrapper_address\n"
-                    "bootstrap_port: bootstrapper_port\n"
-                    "fluentd_address: fluentd_address\n"
-                    "fluentd_port: fluentd_port\n"
+                    "cloud_address: orchestrator.com\n"
+                    "cloud_port: 42\n"
+                    "bootstrap_address: bootstrapper.com\n"
+                    "bootstrap_port: 42\n"
+                    "fluentd_address: fluentd.com\n"
+                    "fluentd_port: 42\n"
                     "\n"
                     "rootca_cert: /var/opt/magma/tmp/certs/rootCA.pem\n"
                 ),
@@ -961,7 +966,7 @@ Challenge key
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "does_not_exist" / "file.txt"
 
-            self.harness.charm._install_file(file, "content")
+            install_file(file, "content")
 
             self.assertTrue(file.parent.exists())
 
@@ -971,7 +976,7 @@ Challenge key
             file.parent.mkdir()
             file.write_text("content")
 
-            self.assertFalse(self.harness.charm._install_file(file, "content"))
+            self.assertFalse(install_file(file, "content"))
 
     def test_given_file_exists_without_content_when_install_file_then_return_true_and_content_is_written(  # noqa: E501
         self,
@@ -981,7 +986,7 @@ Challenge key
             file.parent.mkdir()
             file.write_text("")
 
-            self.assertTrue(self.harness.charm._install_file(file, "content"))
+            self.assertTrue(install_file(file, "content"))
             self.assertEqual(file.read_text(), "content")
 
     def test_given_file_does_not_exist_when_install_file_then_return_true_and_content_is_written(  # noqa: E501
@@ -990,5 +995,5 @@ Challenge key
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "exists" / "file.txt"
 
-            self.assertTrue(self.harness.charm._install_file(file, "content"))
+            self.assertTrue(install_file(file, "content"))
             self.assertEqual(file.read_text(), "content")
