@@ -93,6 +93,13 @@ juju deploy magma-access-gateway-operator --config agw_config.yaml
 
 ### 2. Register AGW with an Orchestrator
 
+Start by using juju to relate the AGW to the orchestrator. This will configure
+the AGW to connect to the orchestrator:
+
+```bash
+juju relate magma-access-gateway-operator [[<controller>:]<user>/]<model-name>.orc8r-nginx-operator
+```
+
 Fetch AGW's `Hardware ID` and `Challenge Key`:
 
 ```bash
@@ -100,8 +107,6 @@ juju run-action magma-access-gateway-operator/<unit number> get-access-gateway-s
 ```
 
 Navigate to "Equipment" on the NMS via the left navigation bar, hit "Add Gateway" on the upper right, and fill out the multi-step modal form. Use the secrets from above for the "Hardware UUID" and "Challenge Key" fields.
-
-**TODO: Fill when orc8r-AGW relation ready**
 
 ### 3. Verify the deployment
 

@@ -4,12 +4,12 @@
 
 """Machine Charm for Magma's Access Gateway."""
 
-import copy
 import ipaddress
 import json
 import logging
 import re
 import subprocess
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
@@ -17,7 +17,33 @@ from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
+from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
+    OrchestratorAvailableEvent,
+    OrchestratorRequires,
+)
+
 logger = logging.getLogger(__name__)
+
+ROOT_CA_PATH = "/var/opt/magma/tmp/certs/rootCA.pem"
+CONFIG_PATH = "/var/opt/magma/configs/control_proxy.yml"
+
+
+def install_file(file: Path, content: str) -> bool:
+    """Install file with provided text content.
+
+    Args:
+        file: Path object to write to
+        content: Text content to write to the file
+
+    Returns:
+        True if the file was written to
+    """
+    if not file.parent.exists():
+        file.parent.mkdir()
+    elif file.exists() and file.read_text() == content:
+        return False
+    file.write_text(content)
+    return True
 
 
 class MagmaAccessGatewayOperatorCharm(CharmBase):
@@ -29,6 +55,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
+        self.orchestrator_requirer = OrchestratorRequires(self, "magma-orchestrator")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_install)
@@ -38,6 +65,11 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         )
         self.framework.observe(
             self.on.post_install_checks_action, self._on_post_install_checks_action
+        )
+
+        self.framework.observe(
+            self.orchestrator_requirer.on.orchestrator_available,
+            self._on_orchestrator_available,
         )
 
     def _on_install(self, event: InstallEvent) -> None:
@@ -130,6 +162,20 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             event.fail(str(e))
             return
 
+    def _on_orchestrator_available(self, event: OrchestratorAvailableEvent):
+        """Triggered when a related orchestrator is made available.
+
+        The AGW will be configured to connect to the orchestrator with the data from
+        the event. Services will then be restarted.
+        """
+        if self._install_configurations(event):
+            self.unit.status = MaintenanceStatus("Restarting Access Gateway to apply changes")
+            self._restart_magma()
+        if not self._magma_service_is_running:
+            event.defer()
+            return
+        self.unit.status = ActiveStatus()
+
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
         """Installs Magma Access Gateway snap.
@@ -161,28 +207,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """Sends the command to reboot the machine in 1 minute."""
         subprocess.run(
             ["shutdown", "--reboot", "+1"],
-            stdout=subprocess.PIPE,
-        )
-
-    @staticmethod
-    def configure_magma_access_gateway(orc8r_domain: str, root_ca_path: str) -> None:
-        """Configures Magma Access Gateway to connect to an Orchestrator.
-
-        Args:
-            orc8r_domain (str): Orchestrator domain.
-            root_ca_path (str): Path to Orchestrator root CA certificate.
-
-        Returns:
-            None
-        """
-        subprocess.run(
-            [
-                "magma-access-gateway.configure",
-                "--domain",
-                orc8r_domain,
-                "--root-ca-pem-path",
-                root_ca_path,
-            ],
             stdout=subprocess.PIPE,
         )
 
@@ -355,7 +379,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             List of arguments for install command
         """
-        config = dict(copy.deepcopy(self.model.config))
+        config = dict(self.model.config)
         if config.pop("skip-networking"):
             return ["--no-reboot", "--skip-networking"]
         arguments = ["--no-reboot", "--dns"]
@@ -400,6 +424,58 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             stdout=subprocess.PIPE,
         )
         return not magma_service.returncode
+
+    def _install_configurations(self, event: OrchestratorAvailableEvent) -> bool:
+        """Install or update configuration files.
+
+        Returns:
+            True if any changes were applied
+        """
+        config = self._generate_config(
+            orchestrator_address=event.orchestrator_address,
+            orchestrator_port=event.orchestrator_port,
+            bootstrapper_address=event.bootstrapper_address,
+            bootstrapper_port=event.bootstrapper_port,
+            fluentd_address=event.fluentd_address,
+            fluentd_port=event.fluentd_port,
+        )
+        return any(
+            [
+                install_file(Path(ROOT_CA_PATH), event.root_ca_certificate),
+                install_file(Path(CONFIG_PATH), config),
+            ]
+        )
+
+    @staticmethod
+    def _generate_config(
+        orchestrator_address: str,
+        orchestrator_port: int,
+        bootstrapper_address: str,
+        bootstrapper_port: int,
+        fluentd_address: str,
+        fluentd_port: int,
+    ) -> str:
+        return (
+            f"cloud_address: {orchestrator_address}\n"
+            f"cloud_port: {orchestrator_port}\n"
+            f"bootstrap_address: {bootstrapper_address}\n"
+            f"bootstrap_port: {bootstrapper_port}\n"
+            f"fluentd_address: {fluentd_address}\n"
+            f"fluentd_port: {fluentd_port}\n"
+            "\n"
+            f"rootca_cert: {ROOT_CA_PATH}\n"
+        )
+
+    @staticmethod
+    def _restart_magma() -> None:
+        subprocess.run(
+            ["service", "magma@*", "stop"],
+            stdout=subprocess.PIPE,
+        )
+        subprocess.run(
+            ["service", "magma@magmad", "start"],
+            stdout=subprocess.PIPE,
+        )
 
 
 if __name__ == "__main__":
