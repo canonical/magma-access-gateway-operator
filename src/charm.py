@@ -17,7 +17,7 @@ from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
-from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
+from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
     OrchestratorRequires,
 )
