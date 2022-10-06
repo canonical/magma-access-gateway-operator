@@ -26,7 +26,7 @@ Example:
 from ops.charm import CharmBase
 from ops.main import main
 
-from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
+from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
     OrchestratorRequires,
 )
@@ -64,7 +64,7 @@ Example:
 from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
 
-from lib.charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
+from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorProvides,
 )
 
@@ -112,7 +112,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 logger = logging.getLogger(__name__)
