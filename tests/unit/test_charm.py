@@ -805,7 +805,7 @@ Challenge key
 
         self.assertEqual(
             action_event.set_results.call_args,
-            call({"hardware-id": test_hw_id, "challange-key": test_challenge_key}),
+            call({"hardware-id": test_hw_id, "challenge-key": test_challenge_key}),
         )
 
     @patch("subprocess.run")

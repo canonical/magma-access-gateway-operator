@@ -112,7 +112,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def _on_get_access_gateway_secrets(self, event: ActionEvent) -> None:
         """Triggered on get-access-gateway-secrets action call.
 
-        Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with
+        Returns Access Gateway's Hardware ID and Challenge Key required to integrate AGW with
         the Orchestrator.
         """
         if not self._magma_service_is_running:
@@ -123,7 +123,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             event.set_results(
                 {
                     "hardware-id": hardware_id,
-                    "challange-key": challenge_key,
+                    "challenge-key": challenge_key,
                 }
             )
         except (subprocess.CalledProcessError, IndexError, ValueError):

@@ -93,11 +93,17 @@ juju deploy magma-access-gateway-operator --config agw_config.yaml
 
 ### 2. Register AGW with an Orchestrator
 
-Start by using juju to relate the AGW to the orchestrator. This will configure
-the AGW to connect to the orchestrator:
+Start by using juju to relate the AGW to the orchestrator. The first step is to
+offer the orchestrator relation outside of the orchestrator model:
 
 ```bash
-juju relate magma-access-gateway-operator [[<controller>:]<user>/]<model-name>.orc8r-nginx-operator
+juju offer orc8r-nginx:orchestrator
+```
+
+Then you can configure the AGW to connect to the orchestrator:
+
+```bash
+juju relate magma-access-gateway-operator [[<controller>:]<user>/]<model-name>.orc8r-nginx
 ```
 
 Fetch AGW's `Hardware ID` and `Challenge Key`:
