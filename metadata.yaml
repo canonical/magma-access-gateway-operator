@@ -15,3 +15,7 @@ requires:
   magma-orchestrator:
     interface: magma-orchestrator
     limit: 1
+
+provides:
+  lte-core:
+    interface: lte-core

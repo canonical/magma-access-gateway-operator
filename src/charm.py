@@ -13,11 +13,18 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
+from charms.lte_core_interface.v0.lte_core_interface import CoreProvides
 from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
     OrchestratorRequires,
 )
-from ops.charm import ActionEvent, CharmBase, InstallEvent, StartEvent
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    InstallEvent,
+    RelationJoinedEvent,
+    StartEvent,
+)
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 
@@ -54,6 +61,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
+        self._lte_core_provides = CoreProvides(self, "lte-core")
         self.orchestrator_requirer = OrchestratorRequires(self, "magma-orchestrator")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
@@ -69,6 +77,10 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.framework.observe(
             self.orchestrator_requirer.on.orchestrator_available,
             self._on_orchestrator_available,
+        )
+
+        self.framework.observe(
+            self.on["lte-core"].relation_broken, self._on_lte_core_relation_joined
         )
 
     def _on_install(self, event: InstallEvent) -> None:
@@ -174,6 +186,29 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             event.defer()
             return
         self.unit.status = ActiveStatus()
+
+    def _on_lte_core_relation_joined(self, event: RelationJoinedEvent):
+        """Triggered when lte-core relation is joined.
+
+        AGW will provide the IP address of gtp_br0 interface if that is available.
+
+        Args:
+            event: Juju event (RelationJoinedEvent)
+
+        Returns:
+            None
+        """
+        try:
+            ip = netifaces.ifaddresses("gtp_br0")[netifaces.AF_INET][0]["addr"]
+            if not self._is_valid_ipv4_gateway(ip):
+                logger.warning("IP address of gtp_br0 not valid.")
+                event.defer()
+                return
+            self._lte_core_provides.set_core_information(ip)
+        except ValueError:
+            logger.warning("Failed to fetch IP address of gtp_br0 interface")
+            event.defer()
+            return
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:

@@ -964,6 +964,48 @@ Challenge key
             ]
         )
 
+    @patch(
+        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
+    )
+    @patch("netifaces.ifaddresses")
+    def test_given_gtp_br0_interface_is_available_when_lte_core_relation_joined_then_then_core_information_is_set(  # noqa: E501
+        self, patch_ip_address, patch_set_core_information
+    ):
+        event = Mock()
+        patch_ip_address.return_value = {2: [{"addr": "0.0.0.0"}]}
+        self.charm._on_lte_core_relation_joined(event)
+        patch_set_core_information.assert_called_once()
+
+    @patch(
+        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
+    )
+    @patch("netifaces.ifaddresses")
+    def test_given_gtp_br0_interface_is_not_available_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
+        # noqa: E501
+        self,
+        patch_ip_address,
+        patch_set_core_information,
+    ):
+        event = Mock()
+        patch_ip_address.side_effect = ValueError()
+        self.charm._on_lte_core_relation_joined(event)
+        patch_set_core_information.assert_not_called()
+
+    @patch(
+        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
+    )
+    @patch("netifaces.ifaddresses")
+    def test_given_gtp_br0_interface_ip_is_not_valid_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
+        # noqa: E501
+        self,
+        patch_ip_address,
+        patch_set_core_information,
+    ):
+        event = Mock()
+        patch_ip_address.return_value = {2: [{"addr": "0.0.0.0.0.0"}]}
+        self.charm._on_lte_core_relation_joined(event)
+        patch_set_core_information.assert_not_called()
+
     def test_given_directory_does_not_exist_when_install_file_then_directory_is_created(self):
         with tempfile.TemporaryDirectory() as directory:
             file = pathlib.Path(directory) / "does_not_exist" / "file.txt"
