@@ -30,13 +30,14 @@ from charm.lte_core_interface.v0.lte_core_interface import (
 class DummyCoreRequirerCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
-        self.lte_core_requirer = CoreRequires(self, "lte-core")
+        self.core_requirer = CoreRequires(self, "lte-core")
         self.framework.observe(
-            self.lte_core_requirer.on.core_available,
-            self._on_core_available,
+            self.core_requirer.on.lte_core_available,
+            self._on_lte_core_available,
         )
-    def _on_core_available(self, event: CoreAvailableEvent):
-        print(event.mme_ipv4_address)
+    def _on_lte_core_available(self, event: CoreAvailableEvent):
+        mme_ipv4_address = event.mme_ipv4_address
+        <Do something with the mme_ipv4_address>
 if __name__ == "__main__":
     main(DummyCoreRequirerCharm)
 ```
@@ -45,7 +46,7 @@ The provider charm is the one providing information about the core network
 for another charm that requires this interface.
 Example:
 ```python
-from ops.charm import CharmBase
+from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
 from charm.lte_core_interface.v0.lte_core_interface import (
     CoreProvides,
@@ -57,16 +58,15 @@ class DummyCoreProviderCharm(CharmBase):
         self.framework.observe(
             self.on.lte_core_relation_joined, self._on_lte_core_relation_joined
         )
-    def _on_lte_core_relation_joined(self, event: RelationJoinedEvent):
-        if self.unit.is_leader():
-            self.core_provider.set_core_information(
-                mme_ipv4_address="mme ipv4 address from the core"
-            )
+    def _on_lte_core_relation_joined(self, event: RelationJoinedEvent) -> None:
+        if not self.unit.is_leader():
+            return
+        mme_ipv4_address = "some code for fetching the mme ipv4 address"
+        self.core_provider.set_core_information(mme_ipv4_address=mme_ipv4_address)
 if __name__ == "__main__":
     main(DummyCoreProviderCharm)
 ```
 """
-
 
 import logging
 from ipaddress import AddressValueError, IPv4Address
@@ -100,7 +100,9 @@ REQUIRER_JSON_SCHEMA = {
     ],
     "properties": {
         "mme_ipv4_address": {
+            "description": "The IP address of the MME (Mobility Management Entity) from core.",  # noqa: E501
             "type": "string",
+            "format": "ipv4",
         },
     },
     "required": [
@@ -163,7 +165,7 @@ class CoreRequires(Object):
         Returns:
             None
         """
-        relation = self.model.get_relation(self.relationship_name)
+        relation = event.relation
         if not relation:
             logger.warning("No relation with name %s", self.relationship_name)
             return
@@ -192,12 +194,12 @@ class CoreProvides(Object):
         self.charm = charm
 
     @staticmethod
-    def mme_ipv4_address_is_valid(mme_ipv4_address: str) -> bool:
+    def _mme_ipv4_address_is_valid(mme_ipv4_address: str) -> bool:
         """Returns whether mme ipv4 address is valid."""
         try:
             IPv4Address(mme_ipv4_address)
             return True
-        except AddressValueError:  # noqa: E722
+        except (AddressValueError):  # noqa: E722
             return False
 
     def set_core_information(self, mme_ipv4_address: str) -> None:
@@ -209,9 +211,9 @@ class CoreProvides(Object):
         Raises:
             AddressValueError: If mme_ipv4_address is not a valid IPv4 address
         """
-        if not self.mme_ipv4_address_is_valid(mme_ipv4_address):
-            raise AddressValueError("Invalid MME IPv4 address.")
-        if relation := self.model.get_relation(self.relationship_name):
-            relation.data[self.charm.app].update({"mme_ipv4_address": mme_ipv4_address})
-        else:
+        if not self.model.get_relation(self.relationship_name):
             raise RuntimeError(f"Relation {self.relationship_name} not created yet.")
+        if not self._mme_ipv4_address_is_valid(mme_ipv4_address):
+            raise AddressValueError("Invalid MME IPv4 address.")
+        relation = self.model.get_relation(self.relationship_name)
+        relation.data[self.charm.app].update({"mme_ipv4_address": mme_ipv4_address})  # type: ignore[union-attr]  # noqa: E501
