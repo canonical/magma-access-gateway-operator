@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from ops import testing
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
 from charm import MagmaAccessGatewayOperatorCharm, install_file
 
@@ -964,47 +964,54 @@ Challenge key
             ]
         )
 
-    @patch(
-        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
-    )
     @patch("netifaces.ifaddresses")
-    def test_given_gtp_br0_interface_is_available_when_lte_core_relation_joined_then_then_core_information_is_set(  # noqa: E501
-        self, patch_ip_address, patch_set_core_information
+    def test_given_eth1_interface_is_available_and_unit_is_leader_when_lte_core_relation_joined_then_then_core_information_is_set_and_charm_is_active(  # noqa: E501
+        self,
+        patch_ip_address,
     ):
-        event = Mock()
+        self.harness.set_leader(True)
         patch_ip_address.return_value = {2: [{"addr": "0.0.0.0"}]}
-        self.charm._on_lte_core_relation_joined(event)
-        patch_set_core_information.assert_called_once()
+        relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
+        self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
+        self.assertEqual(
+            self.harness.get_relation_data(relation_id, self.charm.app),
+            {"mme_ipv4_address": "0.0.0.0"},
+        )
+        self.assertEqual(
+            self.charm.unit.status,
+            ActiveStatus(),
+        )
 
-    @patch(
-        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
-    )
+    def test_given_eth1_interface_is_available_and_unit_is_not_leader_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
+        self,
+    ):
+        self.harness.set_leader(False)
+        relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
+        self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
+        self.assertEqual(
+            self.harness.get_relation_data(relation_id, self.charm.app),
+            {},
+        )
+
     @patch("netifaces.ifaddresses")
-    def test_given_gtp_br0_interface_is_not_available_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
-        # noqa: E501
+    def test_given_eth1_interface_is_not_available_when_lte_core_relation_joined_then_then_core_information_is_not_set_and_charm_is_in_waiting_status(  # noqa: E501
         self,
         patch_ip_address,
-        patch_set_core_information,
     ):
         event = Mock()
+        self.harness.set_leader(True)
         patch_ip_address.side_effect = ValueError()
+        relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
+        self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
         self.charm._on_lte_core_relation_joined(event)
-        patch_set_core_information.assert_not_called()
-
-    @patch(
-        "charms.lte_core_interface.v0.lte_core_interface.CoreProvides.set_core_information",
-    )
-    @patch("netifaces.ifaddresses")
-    def test_given_gtp_br0_interface_ip_is_not_valid_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
-        # noqa: E501
-        self,
-        patch_ip_address,
-        patch_set_core_information,
-    ):
-        event = Mock()
-        patch_ip_address.return_value = {2: [{"addr": "0.0.0.0.0.0"}]}
-        self.charm._on_lte_core_relation_joined(event)
-        patch_set_core_information.assert_not_called()
+        self.assertEqual(
+            self.harness.get_relation_data(relation_id, self.charm.app),
+            {},
+        )
+        self.assertEqual(
+            self.charm.unit.status,
+            WaitingStatus("Waiting for the MME interface to be ready"),
+        )
 
     def test_given_directory_does_not_exist_when_install_file_then_directory_is_created(self):
         with tempfile.TemporaryDirectory() as directory:

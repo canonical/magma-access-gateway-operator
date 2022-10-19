@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import subprocess
+from ipaddress import AddressValueError
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -26,7 +27,7 @@ from ops.charm import (
     StartEvent,
 )
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         )
 
         self.framework.observe(
-            self.on["lte-core"].relation_broken, self._on_lte_core_relation_joined
+            self.on["lte-core"].relation_joined, self._on_lte_core_relation_joined
         )
 
     def _on_install(self, event: InstallEvent) -> None:
@@ -190,7 +191,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def _on_lte_core_relation_joined(self, event: RelationJoinedEvent):
         """Triggered when lte-core relation is joined.
 
-        AGW will provide the IP address of gtp_br0 interface if that is available.
+        AGW will provide the IP address of the MME (eth1) interface if that is available.
 
         Args:
             event: Juju event (RelationJoinedEvent)
@@ -198,15 +199,16 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Returns:
             None
         """
+        if not self.unit.is_leader():
+            return
         try:
-            ip = netifaces.ifaddresses("gtp_br0")[netifaces.AF_INET][0]["addr"]
-            if not self._is_valid_ipv4_gateway(ip):
-                logger.warning("IP address of gtp_br0 not valid.")
-                event.defer()
-                return
+            ip = netifaces.ifaddresses("eth1")[netifaces.AF_INET][0]["addr"]
             self._lte_core_provides.set_core_information(ip)
-        except ValueError:
-            logger.warning("Failed to fetch IP address of gtp_br0 interface")
+            self.unit.status = ActiveStatus()
+        except (ValueError, AddressValueError) as e:
+            logger.warning("Failed to fetch IP address of eth1 interface")
+            logger.error(str(e))
+            self.unit.status = WaitingStatus("Waiting for the MME interface to be ready")
             event.defer()
             return
 
