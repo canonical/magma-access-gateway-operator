@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
-from charms.lte_core_interface.v0.lte_core_interface import CoreProvides
+from charms.lte_core_interface.v0.lte_core_interface import LTECoreProvides
 from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
     OrchestratorRequires,
@@ -62,7 +62,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def __init__(self, *args):
         """Observes juju events."""
         super().__init__(*args)
-        self._lte_core_provides = CoreProvides(self, "lte-core")
+        self._lte_core_provides = LTECoreProvides(self, "lte-core")
         self.orchestrator_requirer = OrchestratorRequires(self, "magma-orchestrator")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
@@ -203,7 +203,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         try:
             ip = netifaces.ifaddresses("eth1")[netifaces.AF_INET][0]["addr"]
-            self._lte_core_provides.set_core_information(ip)
+            self._lte_core_provides.set_lte_core_information(ip)
             self.unit.status = ActiveStatus()
         except (ValueError, AddressValueError) as e:
             logger.warning("Failed to fetch IP address of eth1 interface")
