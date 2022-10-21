@@ -135,5 +135,5 @@ It is possible to connect the AGW to an enodeB using the [lte-core interface](ht
 To relate AGW to [SRS-ENB-UE-Operator](https://github.com/charmed-osm/srs-enb-ue-operator)
 
 ```bash
-juju relate magma-access-gateway-operator charmed-osm-srs-enb-ue
+juju relate magma-access-gateway-operator <enodeb juju application name>
 ```
