@@ -965,7 +965,7 @@ Challenge key
         )
 
     @patch("netifaces.ifaddresses")
-    def test_given_eth1_interface_is_available_and_unit_is_leader_when_lte_core_relation_joined_then_then_core_information_is_set_and_charm_is_active(  # noqa: E501
+    def test_given_eth1_interface_is_available_and_unit_is_leader_when_lte_core_relation_joined_then_then_core_information_is_set(  # noqa: E501
         self,
         patch_ip_address,
     ):
@@ -977,12 +977,22 @@ Challenge key
             self.harness.get_relation_data(relation_id, self.charm.app),
             {"mme_ipv4_address": "0.0.0.0"},
         )
+
+    @patch("netifaces.ifaddresses")
+    def test_given_eth1_interface_is_available_and_unit_is_leader_when_lte_core_relation_joined_then_charm_is_active(  # noqa: E501
+        self,
+        patch_ip_address,
+    ):
+        self.harness.set_leader(True)
+        patch_ip_address.return_value = {2: [{"addr": "0.0.0.0"}]}
+        relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
+        self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
         self.assertEqual(
             self.charm.unit.status,
             ActiveStatus(),
         )
 
-    def test_given_eth1_interface_is_available_and_unit_is_not_leader_when_lte_core_relation_joined_then_then_core_information_is_not_set(  # noqa: E501
+    def test_given_eth1_interface_is_available_and_unit_is_not_leader_when_lte_core_relation_joined_then_core_information_is_not_set(  # noqa: E501
         self,
     ):
         self.harness.set_leader(False)
@@ -993,21 +1003,23 @@ Challenge key
             {},
         )
 
-    @patch("netifaces.ifaddresses")
-    def test_given_eth1_interface_is_not_available_when_lte_core_relation_joined_then_then_core_information_is_not_set_and_charm_is_in_waiting_status(  # noqa: E501
+    def test_given_eth1_interface_is_not_available_when_lte_core_relation_joined_then_core_information_is_not_set(  # noqa: E501
         self,
-        patch_ip_address,
     ):
-        event = Mock()
         self.harness.set_leader(True)
-        patch_ip_address.side_effect = ValueError()
         relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
         self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
-        self.charm._on_lte_core_relation_joined(event)
         self.assertEqual(
             self.harness.get_relation_data(relation_id, self.charm.app),
             {},
         )
+
+    def test_given_eth1_interface_is_not_available_when_lte_core_relation_joined_then_charm_is_in_waiting_status(  # noqa: E501
+        self,
+    ):
+        self.harness.set_leader(True)
+        relation_id = self.harness.add_relation("lte-core", "srs-enb-ue-operator")
+        self.harness.add_relation_unit(relation_id, "srs-enb-ue-operator/0")
         self.assertEqual(
             self.charm.unit.status,
             WaitingStatus("Waiting for the MME interface to be ready"),

@@ -206,8 +206,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             self._lte_core_provides.set_lte_core_information(ip)
             self.unit.status = ActiveStatus()
         except (ValueError, AddressValueError) as e:
-            logger.warning("Failed to fetch IP address of eth1 interface")
-            logger.error(str(e))
+            logger.error(f"Failed to fetch IP address of eth1 interface: {str(e)}")
             self.unit.status = WaitingStatus("Waiting for the MME interface to be ready")
             event.defer()
             return
