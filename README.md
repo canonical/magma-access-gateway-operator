@@ -125,3 +125,15 @@ juju run-action magma-access-gateway-operator/<unit number> post-install-checks 
 Successful AGW deployment will be indicated by the `Magma AGW post-installation checks finished successfully.` message.
 
 > :warning: Success will only occur when attached with an Orchestrator.
+
+## Relations
+
+### lte-core: Connect AGW to an enodeB
+
+It is possible to connect the AGW to an enodeB using the [lte-core interface](https://github.com/canonical/lte-core-interface).
+
+To relate AGW to [SRS-ENB-UE-Operator](https://github.com/charmed-osm/srs-enb-ue-operator)
+
+```bash
+juju relate magma-access-gateway-operator charmed-osm-srs-enb-ue
+```
