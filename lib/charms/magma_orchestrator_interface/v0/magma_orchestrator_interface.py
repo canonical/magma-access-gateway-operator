@@ -266,7 +266,7 @@ class OrchestratorRequires(Object):
         remote_app_relation_data = relation.data[relation.app]
         if not self._relation_data_is_valid(dict(remote_app_relation_data)):
             logger.warning(
-                f"Provider relation data did not pass JSON Schema validation: "  # type: ignore[index]  # noqa: E501,W505
+                f"Provider relation data did not pass JSON Schema validation: "  # type: ignore[index]
                 f"{event.relation.data[event.app]}"
             )
             return

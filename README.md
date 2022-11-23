@@ -1,6 +1,15 @@
-# magma-access-gateway-operator
+<h1 align="center">
+  <a href="https://magmacore.org/"><img src="magma-logo-purple.svg" width="500" ></a>
+  <p align="center"><a href="https://charmhub.io/magma-access-gateway-operator"><img src="https://charmhub.io/magma-access-gateway-operator/badge.svg" alt="access gateway badge"/></p>
+  <br/>
+  Magma Access Gateway Operator
+</h1>
 
-## Description
+[![Get it from the Snap Store](https://charmhub.io/static/images/badges/en/charmhub-black.svg)](https://charmhub.io/magma-access-gateway-operator)
+
+[Don't have Juju installed?](https://snapcraft.io/juju)
+
+# Description
 
 Magma is an open-source software platform that gives network operators a mobile core network
 solution. Magma has three major components:
@@ -17,22 +26,22 @@ For more information on Magma please visit the [official website](https://magmac
 > :warning: Installing this charm will affect the target computer's networking configuration.
 > Make sure it is installed on designated hardware (personal computers are strongly discouraged).
 
-## System requirements
+# System requirements
 
-### Hardware (baremetal strongly recommended)
+## Hardware (baremetal strongly recommended)
 
 - Processor: x86-64 dual-core processor (around 2GHz clock speed or faster)
 - Memory: 4GB RAM
 - Storage: 32GB or greater SSD
 
-### Networking
+## Networking
 
 At least two ethernet interfaces (SGi and S1)
 
 - SGi for internet connectivity
 - S1 for enodeB connectivity
 
-### Operating System
+## Operating System
 
 - Ubuntu 20.04 LTS
   ([Ubuntu installation guide](https://help.ubuntu.com/lts/installation-guide/amd64/index.html))
@@ -40,7 +49,7 @@ At least two ethernet interfaces (SGi and S1)
 
 > :warning: Some clouds like AWS use newer kernel versions by default. If you want to downgrade your kernel, please refer to the following [guide](https://discourse.ubuntu.com/t/how-to-downgrade-the-kernel-on-ubuntu-20-04-to-the-5-4-lts-version/26459).
 
-## Usage
+# Usage
 
 Deploying the Magma Access Gateway requires a machine with two network
 interfaces, for the SGi interface (this interface will be used to route traffic
@@ -50,9 +59,9 @@ to the eNodeB).
 Production deployment are highly recommended to be deployed on physical
 hardware.
 
-### 1. Install
+## 1. Install
 
-**Using DHCP network configuration**
+### Using DHCP network configuration
 
 For testing the deployment, a VM with two DHCP networks attached will do. Use this command to deploy it:
 
@@ -62,7 +71,7 @@ For testing the deployment, a VM with two DHCP networks attached will do. Use th
 juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2
 ```
 
-**Using static network configuration**
+### Using static network configuration
 
 For static network configuration, the easiest method is to use a YAML
 configuration file:
@@ -91,7 +100,7 @@ Deploy the Access Gateway with this command:
 juju deploy magma-access-gateway-operator --config agw_config.yaml
 ```
 
-### 2. Register AGW with an Orchestrator
+## 2. Register AGW with an Orchestrator
 
 Start by using juju to relate the AGW to the orchestrator. The first step is to
 offer the orchestrator relation outside of the orchestrator model:
@@ -114,7 +123,7 @@ juju run-action magma-access-gateway-operator/<unit number> get-access-gateway-s
 
 Navigate to "Equipment" on the NMS via the left navigation bar, hit "Add Gateway" on the upper right, and fill out the multi-step modal form. Use the secrets from above for the "Hardware UUID" and "Challenge Key" fields.
 
-### 3. Verify the deployment
+## 3. Verify the deployment
 
 Run the following command:
 
@@ -126,9 +135,9 @@ Successful AGW deployment will be indicated by the `Magma AGW post-installation 
 
 > :warning: Success will only occur when attached with an Orchestrator.
 
-## Relations
+# Relations
 
-### lte-core: Connect AGW to an enodeB
+## lte-core: Connect AGW to an enodeB
 
 It is possible to connect the AGW to an enodeB using the [lte-core interface](https://github.com/canonical/lte-core-interface).
 
