@@ -81,8 +81,11 @@ class DummyLTECoreProviderCharm(CharmBase):
     def _on_lte_core_relation_joined(self, event: RelationJoinedEvent) -> None:
         if not self.unit.is_leader():
             return
-        mme_ipv4_address = "some code for fetching the mme ipv4 address"
-        self.lte_core_provider.set_lte_core_information(mme_ipv4_address=mme_ipv4_address)
+        mme_ipv4_address = "<Here goes your code for fetching the MME IPv4 address>"
+        try:
+            self.lte_core_provider.set_lte_core_information(mme_ipv4_address=mme_ipv4_address)
+        except AddressValueError:
+            self.unit.status = BlockedStatus("Invalid MME IPv4 address.")
 
 
 if __name__ == "__main__":
@@ -106,7 +109,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 logger = logging.getLogger(__name__)
@@ -177,8 +180,7 @@ class LTECoreRequires(Object):
         try:
             validate(instance=remote_app_relation_data, schema=REQUIRER_JSON_SCHEMA)
             return True
-        except exceptions.ValidationError as e:
-            logger.error("Invalid relation data: %s", e)
+        except exceptions.ValidationError:
             return False
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -196,9 +198,8 @@ class LTECoreRequires(Object):
             return
         remote_app_relation_data = relation.data[relation.app]
         if not self._relation_data_is_valid(dict(remote_app_relation_data)):
-            logger.warning(
-                "Provider relation data did no pass JSON Schema validation: \n%s",
-                event.relation.app[event.app],  # type: ignore[index]
+            logger.error(
+                "Provider relation data did not pass JSON schema validation."  # noqa: E501
             )
             return
         self.on.lte_core_available.emit(

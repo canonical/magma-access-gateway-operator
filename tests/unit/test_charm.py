@@ -3,7 +3,6 @@
 
 import pathlib
 import tempfile
-import typing
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -20,7 +19,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.harness = testing.Harness(MagmaAccessGatewayOperatorCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
-        self.charm = typing.cast(MagmaAccessGatewayOperatorCharm, self.harness.charm)
+        self.charm = self.harness.charm
 
     @patch("subprocess.run")
     def test_given_no_config_provided_when_install_then_snap_is_installed_and_status_is_blocked(
