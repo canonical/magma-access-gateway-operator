@@ -11,7 +11,30 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 
 from charm import MagmaAccessGatewayOperatorCharm, install_file
 
-testing.SIMULATE_CAN_CONNECT = True
+
+class PathMock:
+    def __init__(self, *args, **kwargs):
+        if "exists" in kwargs:
+            self._exists = True
+        else:
+            self._exists = False
+        pass
+
+    def exists(self):
+        return self._exists
+
+    def mkdir(self):
+        pass
+
+    def write_text(self, _):
+        pass
+
+    def read_text(self):
+        pass
+
+    @property
+    def parent(self):
+        return self
 
 
 class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
@@ -913,6 +936,56 @@ Challenge key
 
     @patch("charm.Path")
     @patch("subprocess.run")
+    @patch("os.remove")
+    def test_given_certifier_pem_not_stored_when_certifier_pem_changed_then_remove_agw_certs_not_called(  # noqa: E501
+        self, patch_remove, patch_subprocess_run, patch_path
+    ):
+        patch_path.return_value = PathMock()
+        relation_id = self.harness.add_relation("magma-orchestrator", "orc8r-nginx-operator")
+        self.harness.add_relation_unit(relation_id, "orc8r-nginx-operator/0")
+        self.harness.update_relation_data(
+            relation_id,
+            "orc8r-nginx-operator",
+            {
+                "root_ca_certificate": "root_ca_certificate_content",
+                "certifier_pem_certificate": "certifier_pem_certificate_content",
+                "orchestrator_address": "orchestrator.com",
+                "orchestrator_port": "42",
+                "bootstrapper_address": "bootstrapper.com",
+                "bootstrapper_port": "42",
+                "fluentd_address": "fluentd.com",
+                "fluentd_port": "42",
+            },
+        )
+        patch_remove.assert_not_called()
+
+    @patch("charm.Path")
+    @patch("subprocess.run")
+    @patch("os.remove")
+    def test_given_certifier_pem_stored_when_certifier_pem_changed_then_remove_agw_certs_called(
+        self, patch_remove, patch_subprocess_run, patch_path
+    ):
+        patch_path.return_value = PathMock(exists=True)
+        relation_id = self.harness.add_relation("magma-orchestrator", "orc8r-nginx-operator")
+        self.harness.add_relation_unit(relation_id, "orc8r-nginx-operator/0")
+        self.harness.update_relation_data(
+            relation_id,
+            "orc8r-nginx-operator",
+            {
+                "root_ca_certificate": "root_ca_certificate_content",
+                "certifier_pem_certificate": "certifier_pem_certificate_content",
+                "orchestrator_address": "orchestrator.com",
+                "orchestrator_port": "42",
+                "bootstrapper_address": "bootstrapper.com",
+                "bootstrapper_port": "42",
+                "fluentd_address": "fluentd.com",
+                "fluentd_port": "42",
+            },
+        )
+        patch_remove.assert_called()
+
+    @patch("charm.Path")
+    @patch("subprocess.run")
     def test_when_orchestrator_available_event_then_configuration_is_installed(
         self, patch_subprocess_run, patch_path
     ):
@@ -923,6 +996,7 @@ Challenge key
             "orc8r-nginx-operator",
             {
                 "root_ca_certificate": "root_ca_certificate_content",
+                "certifier_pem_certificate": "certifier_pem_certificate_content",
                 "orchestrator_address": "orchestrator.com",
                 "orchestrator_port": "42",
                 "bootstrapper_address": "bootstrapper.com",
@@ -932,24 +1006,26 @@ Challenge key
             },
         )
 
-        patch_path.assert_has_calls(
-            [
-                call("/var/opt/magma/tmp/certs/rootCA.pem"),
-                call().write_text("root_ca_certificate_content"),
-                call("/var/opt/magma/configs/control_proxy.yml"),
-                call().write_text(
-                    "cloud_address: orchestrator.com\n"
-                    "cloud_port: 42\n"
-                    "bootstrap_address: bootstrapper.com\n"
-                    "bootstrap_port: 42\n"
-                    "fluentd_address: fluentd.com\n"
-                    "fluentd_port: 42\n"
-                    "\n"
-                    "rootca_cert: /var/opt/magma/tmp/certs/rootCA.pem\n"
-                ),
-            ],
-            any_order=True,
-        )
+        mock_calls = patch_path.mock_calls
+        expected_calls = [
+            call("/var/opt/magma/tmp/certs/rootCA.pem"),
+            call().write_text("root_ca_certificate_content"),
+            call("/var/opt/magma/tmp/certs/certifier.pem"),
+            call().write_text("root_ca_certificate_content"),
+            call("/var/opt/magma/configs/control_proxy.yml"),
+            call().write_text(
+                "cloud_address: orchestrator.com\n"
+                "cloud_port: 42\n"
+                "bootstrap_address: bootstrapper.com\n"
+                "bootstrap_port: 42\n"
+                "fluentd_address: fluentd.com\n"
+                "fluentd_port: 42\n"
+                "\n"
+                "rootca_cert: /var/opt/magma/tmp/certs/rootCA.pem\n"
+            ),
+        ]
+        self.assertTrue(all(call in mock_calls for call in expected_calls))
+
         patch_subprocess_run.assert_has_calls(
             [
                 call(

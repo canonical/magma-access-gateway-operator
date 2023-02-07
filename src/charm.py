@@ -7,6 +7,7 @@
 import ipaddress
 import json
 import logging
+import os
 import re
 import subprocess
 from ipaddress import AddressValueError
@@ -32,6 +33,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 logger = logging.getLogger(__name__)
 
 ROOT_CA_PATH = "/var/opt/magma/tmp/certs/rootCA.pem"
+CERT_CERTIFIER_CERT = "/var/opt/magma/tmp/certs/certifier.pem"
 CONFIG_PATH = "/var/opt/magma/configs/control_proxy.yml"
 
 
@@ -135,8 +137,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             hardware_id, challenge_key = self._get_magma_secrets
             event.set_results(
                 {
-                    "hardware-id": hardware_id,  # type: ignore[dict-item]
-                    "challenge-key": challenge_key,  # type: ignore[dict-item]
+                    "hardware-id": hardware_id,
+                    "challenge-key": challenge_key,
                 }
             )
         except (subprocess.CalledProcessError, IndexError, ValueError):
@@ -167,7 +169,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
                     else failed_msg
                 }
             )
-        except (subprocess.CalledProcessError):
+        except subprocess.CalledProcessError:
             event.fail("Failed to run post-install checks.")
             return
         except Exception as e:
@@ -180,6 +182,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         The AGW will be configured to connect to the orchestrator with the data from
         the event. Services will then be restarted.
         """
+        if self._certifier_pem_changed(event.certifier_pem_certificate):
+            self._remove_agw_cert_files()
         if self._install_configurations(event):
             self.unit.status = MaintenanceStatus("Restarting Access Gateway to apply changes")
             self._restart_magma()
@@ -288,6 +292,26 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             logger.warning("%s interface not found", (interface))
             return False
         return True
+
+    def _certifier_pem_changed(self, new_cert):
+        if Path(CERT_CERTIFIER_CERT).exists():
+            print("hello")
+        return (
+            Path(CERT_CERTIFIER_CERT).exists()
+            and Path(CERT_CERTIFIER_CERT).read_text() != new_cert  # noqa: W503
+        )
+
+    @staticmethod
+    def _remove_agw_cert_files():
+        for file in [
+            "/var/opt/magma/gateway.crt",
+            "/var/opt/magma/gateway.key",
+            "/var/opt/magma/gw_challenge.key",
+        ]:
+            try:
+                os.remove(file)
+            except FileNotFoundError:
+                logger.debug("File does not exist: " + file)
 
     @property
     def _is_valid_sgi_interface_addressing_configuration(self) -> bool:
@@ -477,6 +501,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         return any(
             [
                 install_file(Path(ROOT_CA_PATH), event.root_ca_certificate),
+                install_file(Path(CERT_CERTIFIER_CERT), event.certifier_pem_certificate),
                 install_file(Path(CONFIG_PATH), config),
             ]
         )
