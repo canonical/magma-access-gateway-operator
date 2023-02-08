@@ -2,45 +2,33 @@
 # See LICENSE file for licensing details.
 
 """Library for the magma-orchestrator relation.
-
 This library contains the Requires and Provides classes for handling the magma-orchestrator
 interface.
-
 ## Getting Started
 From a charm directory, fetch the library using `charmcraft`:
-
 ```shell
 charmcraft fetch-lib charms.magma_orchestrator_interface.v0.magma_orchestrator_interface
 ```
-
 Add the following libraries to the charm's `requirements.txt` file:
 - jsonschema
-
 ### Requirer charm
 The requirer charm is the charm requiring to connect to an instance of Magma Orchestrator
 from another charm that provides this interface.
-
 Example:
 ```python
-
 from ops.charm import CharmBase
 from ops.main import main
-
 from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
     OrchestratorRequires,
 )
-
-
 class DummyMagmaOrchestratorRequirerCharm(CharmBase):
-
     def __init__(self, *args):
         super().__init__(*args)
         self.orchestrator_requirer = OrchestratorRequires(self, "orchestrator")
         self.framework.observe(
             self.orchestrator_requirer.on.orchestrator_available, self._on_orchestrator_available
         )
-
     def _on_orchestrator_available(self, event: OrchestratorAvailableEvent):
         print(event.root_ca_certificate)
         print(event.orchestrator_address)
@@ -49,35 +37,26 @@ class DummyMagmaOrchestratorRequirerCharm(CharmBase):
         print(event.orchestrator_port)
         print(event.fluentd_address)
         print(event.fluentd_port)
-
-
 if __name__ == "__main__":
     main(DummyMagmaOrchestratorRequirerCharm)
 ```
-
 ### Provider charm
 The provider charm is the charm providing information about a Magma Orchestrator
 for another charm that requires this interface.
-
 Example:
 ```python
 from ops.charm import CharmBase, RelationJoinedEvent
 from ops.main import main
-
 from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorProvides,
 )
-
-
 class DummyMagmaOrchestratorProviderCharm(CharmBase):
-
     def __init__(self, *args):
         super().__init__(*args)
         self.orchestrator_provider = OrchestratorProvides(self, "orchestrator")
         self.framework.observe(
             self.on.orchestrator_relation_joined, self._on_orchestrator_relation_joined
         )
-
     def _on_orchestrator_relation_joined(self, event: RelationJoinedEvent):
         if self.unit.is_leader():
             self.orchestrator_provider.set_orchestrator_information(
@@ -89,12 +68,9 @@ class DummyMagmaOrchestratorProviderCharm(CharmBase):
                 fluentd_address="http://fluentd.com",
                 fluentd_port=9112,
             )
-
-
 if __name__ == "__main__":
     main(DummyMagmaOrchestratorProviderCharm)
 ```
-
 """
 
 
@@ -114,7 +90,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 
 logger = logging.getLogger(__name__)
@@ -128,11 +104,11 @@ REQUIRER_JSON_SCHEMA = {
         {
             "root_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCFFPAOD7utDTsgFrm0vS4We18OcnKMA0GCSqGSIb3DQEBCwUAMCAx\nCzAJBgNVBAYTAlVTMREwDwYDVQQDDAh3aGF0ZXZlcjAeFw0yMjA3MjkyMTE5Mzha\nFw0yMzA3MjkyMTE5MzhaMBUxEzARBgNVBAMMCmJhbmFuYS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDVpcfcBOnFuyZG+A2WQzmaBI5NXgwTCfvE\neKciqRQXhzJdUkEg7eqwFrK3y9yjhoiB6q0WNAeR+nOdS/Cw7layRtGz5skOq7Aa\nN4FZHg0or30i7Rrx7afJcGJyLpxfK/OfLmJm5QEdLXV0DZp0L5vuhhEb1EUOrMaY\nGe4iwqTyg6D7fuBili9dBVn9IvNhYMVgtiqkWVLTW4ChE0LgES4oO3rQZgp4dtM5\nsp6KwHGO766UzwGnkKRizaqmLylfVusllWNPFfp6gEaxa45N70oqGUrvGSVHWeHf\nfvkhpWx+wOnu+2A5F/Yv3UNz2v4g7Vjt7V0tjL4KMV9YklpRjTh3AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAChjRzuba8zjQ7NYBVas89Oy7u++MlS8xWxh++yiUsV6\nWMk3ZemsPtXc1YmXorIQohtxLxzUPm2JhyzFzU/sOLmJQ1E/l+gtZHyRCwsb20fX\nmphuJsMVd7qv/GwEk9PBsk2uDqg4/Wix0Rx5lf95juJP7CPXQJl5FQauf3+LSz0y\nwF/j+4GqvrwsWr9hKOLmPdkyKkR6bHKtzzsxL9PM8GnElk2OpaPMMnzbL/vt2IAt\nxK01ZzPxCQCzVwHo5IJO5NR/fIyFbEPhxzG17QsRDOBR9fl9cOIvDeSO04vyZ+nz\n+kA2c3fNrZFAtpIlOOmFh8Q12rVL4sAjI5mVWnNEgvI=\n-----END CERTIFICATE-----\n",  # noqa: E501
             "certifier_pem_certificate": "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCFFPAOD7utDTsgFrm0vS4We18OcnKMA0GCSqGSIb3DQEBCwUAMCAx\nCzAJBgNVBAYTAlVTMREwDwYDVQQDDAh3aGF0ZXZlcjAeFw0yMjA3MjkyMTE5Mzha\nFw0yMzA3MjkyMTE5MzhaMBUxEzARBgNVBAMMCmJhbmFuYS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDVpcfcBOnFuyZG+A2WQzmaBI5NXgwTCfvE\neKciqRQXhzJdUkEg7eqwFrK3y9yjhoiB6q0WNAeR+nOdS/Cw7layRtGz5skOq7Aa\nN4FZHg0or30i7Rrx7afJcGJyLpxfK/OfLmJm5QEdLXV0DZp0L5vuhhEb1EUOrMaY\nGe4iwqTyg6D7fuBili9dBVn9IvNhYMVgtiqkWVLTW4ChE0LgES4oO3rQZgp4dtM5\nsp6KwHGO766UzwGnkKRizaqmLylfVusllWNPFfp6gEaxa45N70oqGUrvGSVHWeHf\nfvkhpWx+wOnu+2A5F/Yv3UNz2v4g7Vjt7V0tjL4KMV9YklpRjTh3AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAChjRzuba8zjQ7NYBVas89Oy7u++MlS8xWxh++yiUsV6\nWMk3ZemsPtXc1YmXorIQohtxLxzUPm2JhyzFzU/sOLmJQ1E/l+gtZHyRCwsb20fX\nmphuJsMVd7qv/GwEk9PBsk2uDqg4/Wix0Rx5lf95juJP7CPXQJl5FQauf3+LSz0y\nwF/j+4GqvrwsWr9hKOLmPdkyKkR6bHKtzzsxL9PM8GnElk2OpaPMMnzbL/vt2IAt\nxK01ZzPxCQCzVwHo5IJO5NR/fIyFbEPhxzG17QsRDOBR9fl9cOIvDeSO04vyZ+nz\n+kA2c3fNrZFAtpIlOOmFh8Q12rVL4sAjI5mVWnNEgvI=\n-----END CERTIFICATE-----\n",  # noqa: E501
-            "orchestrator_address": "http://orchestrator.com",
+            "orchestrator_address": "orchestrator.com",
             "orchestrator_port": "1234",
-            "bootstrapper_address": "http://bootstrapper.com",
+            "bootstrapper_address": "bootstrapper.com",
             "bootstrapper_port": "5678",
-            "fluentd_address": "http://fluentd.com",
+            "fluentd_address": "fluentd.com",
             "fluentd_port": "9112",
         }
     ],
@@ -145,21 +121,18 @@ REQUIRER_JSON_SCHEMA = {
         },
         "orchestrator_address": {
             "type": "string",
-            "format": "string",
         },
         "orchestrator_port": {
             "type": "string",
         },
         "bootstrapper_address": {
             "type": "string",
-            "format": "string",
         },
         "bootstrapper_port": {
             "type": "string",
         },
         "fluentd_address": {
             "type": "string",
-            "format": "string",
         },
         "fluentd_port": {
             "type": "string",
@@ -273,10 +246,8 @@ class OrchestratorRequires(Object):
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handler triggered on relation changed events.
-
         Args:
             event: Juju event
-
         Returns:
             None
         """
@@ -340,7 +311,6 @@ class OrchestratorProvides(Object):
         fluentd_port: int = 24224,
     ):
         """Sets orchestrator information in application relation data.
-
         Args:
             root_ca_certificate: Orchestrator Root CA Certificate
             certifier_pem_certificate: Orchestrator `certifier.pem`
@@ -350,7 +320,6 @@ class OrchestratorProvides(Object):
             orchestrator_port: Orchestrator port (Default: 443)
             bootstrapper_port: Bootstrapper port (Default: 443)
             fluentd_port: Fluentd port (Default: 24224)
-
         Returns:
             None
         """
