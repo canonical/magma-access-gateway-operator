@@ -7,7 +7,6 @@
 import ipaddress
 import json
 import logging
-import os
 import re
 import subprocess
 from ipaddress import AddressValueError
@@ -294,8 +293,6 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         return True
 
     def _certifier_pem_changed(self, new_cert):
-        if Path(CERT_CERTIFIER_CERT).exists():
-            print("hello")
         return (
             Path(CERT_CERTIFIER_CERT).exists()
             and Path(CERT_CERTIFIER_CERT).read_text() != new_cert  # noqa: W503
@@ -309,7 +306,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             "/var/opt/magma/gw_challenge.key",
         ]:
             try:
-                os.remove(file)
+                Path(file).unlink()
             except FileNotFoundError:
                 logger.debug("File does not exist: " + file)
 

@@ -12,31 +12,6 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 from charm import MagmaAccessGatewayOperatorCharm, install_file
 
 
-class PathMock:
-    def __init__(self, *args, **kwargs):
-        if "exists" in kwargs:
-            self._exists = True
-        else:
-            self._exists = False
-        pass
-
-    def exists(self):
-        return self._exists
-
-    def mkdir(self):
-        pass
-
-    def write_text(self, _):
-        pass
-
-    def read_text(self):
-        pass
-
-    @property
-    def parent(self):
-        return self
-
-
 class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
     def setUp(self):
         self.harness = testing.Harness(MagmaAccessGatewayOperatorCharm)
@@ -934,13 +909,12 @@ Challenge key
             ]
         )
 
-    @patch("charm.Path")
     @patch("subprocess.run")
-    @patch("os.remove")
+    @patch("charm.Path")
     def test_given_certifier_pem_not_stored_when_certifier_pem_changed_then_remove_agw_certs_not_called(  # noqa: E501
-        self, patch_remove, patch_subprocess_run, patch_path
+        self, patch_path, _
     ):
-        patch_path.return_value = PathMock()
+        patch_path.return_value.exists.return_value = False
         relation_id = self.harness.add_relation("magma-orchestrator", "orc8r-nginx-operator")
         self.harness.add_relation_unit(relation_id, "orc8r-nginx-operator/0")
         self.harness.update_relation_data(
@@ -957,15 +931,13 @@ Challenge key
                 "fluentd_port": "42",
             },
         )
-        patch_remove.assert_not_called()
+        self.assertNotIn(call().unlink(), patch_path.mock_calls)
 
-    @patch("charm.Path")
     @patch("subprocess.run")
-    @patch("os.remove")
+    @patch("charm.Path")
     def test_given_certifier_pem_stored_when_certifier_pem_changed_then_remove_agw_certs_called(
-        self, patch_remove, patch_subprocess_run, patch_path
+        self, patch_path, _
     ):
-        patch_path.return_value = PathMock(exists=True)
         relation_id = self.harness.add_relation("magma-orchestrator", "orc8r-nginx-operator")
         self.harness.add_relation_unit(relation_id, "orc8r-nginx-operator/0")
         self.harness.update_relation_data(
@@ -982,7 +954,7 @@ Challenge key
                 "fluentd_port": "42",
             },
         )
-        patch_remove.assert_called()
+        self.assertIn(call().unlink(), patch_path.mock_calls)
 
     @patch("charm.Path")
     @patch("subprocess.run")
