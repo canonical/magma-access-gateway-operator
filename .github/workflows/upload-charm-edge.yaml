@@ -3,7 +3,7 @@ name: Upload Charm
 on:
   push:
     branches:
-      - "main"
+      - "1.6"
 
 jobs:
   charmhub-upload:
@@ -19,7 +19,8 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 20
       - name: Upload charm to charmhub
-        uses: canonical/charming-actions/upload-charm@2.0.0-rc
+        uses: canonical/charming-actions/upload-charm@2.2.2
         with:
           credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: 1.6/edge
