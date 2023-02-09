@@ -62,6 +62,6 @@ jobs:
         uses: charmed-kubernetes/actions-operator@1.1.0
         with:
           provider: microk8s
-          juju-channel: $JUJU_CHANNEL
+          juju-channel: ${{ env.JUJU_CHANNEL }}
       - name: Run integration tests
         run: tox -e integration
