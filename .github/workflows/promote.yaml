@@ -13,8 +13,9 @@ on:
 
 jobs:
   promote:
+    if: contains([1.6, main], github.ref_name)
     name: Promote Charm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -32,11 +33,19 @@ jobs:
             echo "promote-from=candidate" >> ${GITHUB_ENV}
             echo "promote-to=stable" >> ${GITHUB_ENV}
           fi
-      - name: Promote Charm
+      - name: Promote charm to latest
+        if: github.ref_name==main
         uses: canonical/charming-actions/release-charm@2.0.0
         with:
           credentials: ${{ secrets.CHARMCRAFT_AUTH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           destination-channel: latest/${{ env.promote-to }}
           origin-channel: latest/${{ env.promote-from }}
-          charmcraft-channel: latest/stable
+      - name: Promote charm to release track
+        if: github.ref_name!=main
+        uses: canonical/charming-actions/release-charm@2.0.0
+        with:
+          credentials: ${{ secrets.CHARMCRAFT_AUTH }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          destination-channel: github.ref_name/${{ env.promote-to }}
+          origin-channel: github.ref_name/${{ env.promote-from }}
