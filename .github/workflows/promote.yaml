@@ -13,7 +13,7 @@ on:
 
 jobs:
   promote:
-    if: contains(fromJSON('["1.6", "main"]'), github.ref_name)
+    if: github.ref_name == '1.6'
     name: Promote Charm
     runs-on: ubuntu-latest
     steps:
@@ -33,19 +33,10 @@ jobs:
             echo "promote-from=candidate" >> ${GITHUB_ENV}
             echo "promote-to=stable" >> ${GITHUB_ENV}
           fi
-      - name: Promote charm to latest
-        if: github.ref_name == 'main'
+      - name: Promote Charm
         uses: canonical/charming-actions/release-charm@2.2.2
         with:
           credentials: ${{ secrets.CHARMCRAFT_AUTH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          destination-channel: latest/${{ env.promote-to }}
-          origin-channel: latest/${{ env.promote-from }}
-      - name: Promote charm to release track
-        if: github.ref_name != 'main'
-        uses: canonical/charming-actions/release-charm@2.2.2
-        with:
-          credentials: ${{ secrets.CHARMCRAFT_AUTH }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          destination-channel: github.ref_name/${{ env.promote-to }}
-          origin-channel: github.ref_name/${{ env.promote-from }}
+          destination-channel: 1.6/${{ env.promote-to }}
+          origin-channel: 1.6/${{ env.promote-from }}
