@@ -6,5 +6,5 @@ post-install-checks:
     Runs post-install checks. It will only succeed when attached with an Orchestrator.
 get-access-gateway-secrets:
   description: |
-    Returns Access Gateway's Hardware ID and Challange Key required to integrate AGW with 
+    Returns Access Gateway's Hardware ID and Challenge Key required to integrate AGW with 
     the Orchestrator.
