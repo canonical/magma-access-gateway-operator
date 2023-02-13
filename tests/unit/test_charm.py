@@ -11,7 +11,7 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingSta
 
 from charm import MagmaAccessGatewayOperatorCharm, install_file
 
-testing.SIMULATE_CAN_CONNECT = True
+testing.SIMULATE_CAN_CONNECT = True  # type: ignore[attr-defined]
 
 
 class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):

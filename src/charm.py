@@ -135,8 +135,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             hardware_id, challenge_key = self._get_magma_secrets
             event.set_results(
                 {
-                    "hardware-id": hardware_id,  # type: ignore[dict-item]
-                    "challenge-key": challenge_key,  # type: ignore[dict-item]
+                    "hardware-id": hardware_id,
+                    "challenge-key": challenge_key,
                 }
             )
         except (subprocess.CalledProcessError, IndexError, ValueError):
