@@ -32,7 +32,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--channel",
+                        "1.6/stable",
+                        "--classic",
+                    ],
+                    stdout=-1,
                 ),
             ]
         )
@@ -62,7 +70,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--channel",
+                        "1.6/stable",
+                        "--classic",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
@@ -93,7 +109,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--channel",
+                        "1.6/stable",
+                        "--classic",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
@@ -634,7 +658,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--channel",
+                        "1.6/stable",
+                        "--classic",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     [
@@ -691,7 +723,15 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--channel",
+                        "1.6/stable",
+                        "--classic",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     [
