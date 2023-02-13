@@ -167,7 +167,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
                     else failed_msg
                 }
             )
-        except (subprocess.CalledProcessError):
+        except subprocess.CalledProcessError:
             event.fail("Failed to run post-install checks.")
             return
         except Exception as e:
