@@ -3,7 +3,7 @@ name: Upload Charm
 on:
   push:
     branches:
-      - "main"
+      - "1.6"
 
 jobs:
   charmhub-upload:
@@ -11,6 +11,10 @@ jobs:
     name: Charmhub upload
     steps:
       - uses: actions/checkout@v2
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
       - name: Wait for integration tests to succeed
         uses: lewagon/wait-on-check-action@v1.1.2
         with:
@@ -19,7 +23,9 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 20
       - name: Upload charm to charmhub
-        uses: canonical/charming-actions/upload-charm@2.0.0-rc
+        uses: canonical/charming-actions/upload-charm@2.2.2
         with:
           credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: 1.6/edge
+          charmcraft-channel: ${{ env.CHARMCRAFT_VERSION }}
