@@ -7,7 +7,6 @@ Create and activate a virtualenv with the development requirements:
     virtualenv -p python3 venv
     source venv/bin/activate
 
-
 ## Testing
 
 ### Unit tests
@@ -20,6 +19,12 @@ tox -e unit
 
 ```bash
 tox -e static
+```
+
+### Apply coding style standards to code
+
+```bash
+tox -e fmt
 ```
 
 ### Linting
