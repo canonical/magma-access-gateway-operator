@@ -2,7 +2,7 @@
   <a href="https://magmacore.org/"><img src="magma-logo-purple.svg" width="500" ></a>
   <p align="center"><a href="https://charmhub.io/magma-access-gateway-operator"><img src="https://charmhub.io/magma-access-gateway-operator/badge.svg" alt="access gateway badge"/></p>
   <br/>
-  Magma Access Gateway Operator
+  Magma Access Gateway Operator 1.6
 </h1>
 
 [![Get it from the Snap Store](https://charmhub.io/static/images/badges/en/charmhub-black.svg)](https://charmhub.io/magma-access-gateway-operator)
@@ -68,7 +68,7 @@ For testing the deployment, a VM with two DHCP networks attached will do. Use th
 > :warning: The interface names will need to be adjusted based on your specific machine.
 
 ```bash
-juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2
+juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2 --channel 1.6/stable
 ```
 
 ### Using static network configuration
@@ -97,7 +97,7 @@ minimum also.
 Deploy the Access Gateway with this command:
 
 ```bash
-juju deploy magma-access-gateway-operator --config agw_config.yaml
+juju deploy magma-access-gateway-operator --config agw_config.yaml --channel 1.6/stable
 ```
 
 ## 2. Register AGW with an Orchestrator
@@ -144,6 +144,6 @@ It is possible to connect the AGW to an enodeB using the [lte-core interface](ht
 To relate AGW to [SRS-ENB-UE-Operator](https://github.com/charmed-osm/srs-enb-ue-operator)
 
 ```bash
-juju relate magma-access-gateway-operator <enodeb juju application name>
+juju relate magma-access-gateway-operator <enodeB juju application name>
 ```
 
