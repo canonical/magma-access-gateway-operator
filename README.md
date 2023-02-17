@@ -146,3 +146,4 @@ To relate AGW to [SRS-ENB-UE-Operator](https://github.com/charmed-osm/srs-enb-ue
 ```bash
 juju relate magma-access-gateway-operator <enodeb juju application name>
 ```
+
