@@ -11,12 +11,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+
       - name: Set Environment Variables
         uses: tw3lveparsecs/github-actions-setvars@v0.2
         with:
           varFilePath: ./.github/variables/dependencies_versions.env
+
       - name: Install tox
         run: pip install tox==$TOX_VERSION
+
       - name: Run tests using tox
         run: tox -e lint
 
@@ -25,12 +28,15 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+
       - name: Set Environment Variables
         uses: tw3lveparsecs/github-actions-setvars@v0.2
         with:
           varFilePath: ./.github/variables/dependencies_versions.envs
+
       - name: Install tox
         run: pip install tox==$TOX_VERSION
+
       - name: Run tests using tox
         run: tox -e static
 
@@ -39,36 +45,36 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+
       - name: Set Environment Variables
         uses: tw3lveparsecs/github-actions-setvars@v0.2
         with:
           varFilePath: ./.github/variables/dependencies_versions.env
+
       - name: Install tox
         run: pip install tox==$TOX_VERSION
+
       - name: Run tests using tox
         run: tox -e unit
 
-  integration-test:
-    name: Integration tests
+  charmhub-upload:
+    name: Charmhub upload
     runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-with-coverage
+    if: github.ref_name == '1.6'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
       - name: Set Environment Variables
         uses: tw3lveparsecs/github-actions-setvars@v0.2
         with:
           varFilePath: ./.github/variables/dependencies_versions.env
-      - name: Install tox
-        run: pip install tox==$TOX_VERSION
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@1.1.0
-        with:
-          provider: microk8s
-          channel: ${{ env.MICROK8S_VERSION }}
-          lxd-channel: ${{ env.LXD_VERSION }}
-          charmcraft-channel: ${{ env.CHARMCRAFT_VERSION }}
-          charm-channel: ${{ env.CHARM_VERSION }}
-          juju-channel: ${{ env.JUJU_VERSION }}
 
-      - name: Run integration tests
-        run: tox -e integration
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@2.2.2
+        with:
+          credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: 1.6/edge
+          charmcraft-channel: ${{ env.CHARMCRAFT_VERSION }}
