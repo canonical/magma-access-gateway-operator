@@ -5,7 +5,7 @@
   Magma Access Gateway Operator
 </h1>
 
-[![Get it from the Snap Store](https://charmhub.io/static/images/badges/en/charmhub-black.svg)](https://charmhub.io/magma-access-gateway-operator)
+[![Get it from Charmhub](https://charmhub.io/static/images/badges/en/charmhub-black.svg)](https://charmhub.io/magma-access-gateway-operator)
 
 [Don't have Juju installed?](https://snapcraft.io/juju)
 
@@ -21,6 +21,7 @@ solution. Magma has three major components:
 The Access Gateway (AGW) provides network services and policy enforcement. In an LTE network,
 the AGW implements an evolved packet core (EPC), and a combination of an AAA and a PGW. It works
 with existing, unmodified commercial radio hardware.<br>
+This charm uses version 1.8.0 of Magma Access Gateway.<br>
 For more information on Magma please visit the [official website](https://magmacore.org/).
 
 > :warning: Installing this charm will affect the target computer's networking configuration.
@@ -68,7 +69,7 @@ For testing the deployment, a VM with two DHCP networks attached will do. Use th
 > :warning: The interface names will need to be adjusted based on your specific machine.
 
 ```bash
-juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2
+juju deploy magma-access-gateway-operator --config sgi=enp0s1 --config s1=enp0s2 --channel edge
 ```
 
 ### Using static network configuration
@@ -90,14 +91,10 @@ magma-access-gateway-operator:
   dns: '["8.8.8.8", "208.67.222.222"]'
 ```
 
-_WARNING_ IPv6 support has been added to Magma in version 1.7.0. This charm
-installs the right version, but your orchestrator will need to be at 1.7.0
-minimum also.
-
 Deploy the Access Gateway with this command:
 
 ```bash
-juju deploy magma-access-gateway-operator --config agw_config.yaml
+juju deploy magma-access-gateway-operator --config agw_config.yaml --channel edge
 ```
 
 ## 2. Register AGW with an Orchestrator
