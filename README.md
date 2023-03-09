@@ -35,6 +35,12 @@ For more information on Magma please visit the [official website](https://magmac
 - Memory: 4GB RAM
 - Storage: 32GB or greater SSD
 
+> **NOTE:** For small networks (i.e. 10 eNBs, 10 active subscribers), Magma can produce
+> around 1 GB of logs per week. Most of these logs will go to /var/log/journal.
+> To avoid problems with insufficient disk space, it is recommended to configure log rotation
+> for systemd-journald. For more information please visit
+> [Ubuntu manuals](https://manpages.ubuntu.com/manpages/focal/man5/journald.conf.5.html).
+
 ## Networking
 
 At least two ethernet interfaces (SGi and S1)
@@ -115,7 +121,7 @@ juju relate magma-access-gateway-operator [[<controller>:]<user>/]<model-name>.o
 Fetch AGW's `Hardware ID` and `Challenge Key`:
 
 ```bash
-juju run magma-access-gateway-operator/<unit number> get-access-gateway-secrets
+juju run-action magma-access-gateway-operator/<unit number> get-access-gateway-secrets --wait
 ```
 
 Navigate to "Equipment" on the NMS via the left navigation bar, hit "Add Gateway" on the upper right, and fill out the multi-step modal form. Use the secrets from above for the "Hardware UUID" and "Challenge Key" fields.
@@ -125,7 +131,7 @@ Navigate to "Equipment" on the NMS via the left navigation bar, hit "Add Gateway
 Run the following command:
 
 ```bash
-juju run magma-access-gateway-operator/<unit number> post-install-checks
+juju run-action magma-access-gateway-operator/<unit number> post-install-checks --wait
 ```
 
 Successful AGW deployment will be indicated by the `Magma AGW post-installation checks finished successfully.` message.
