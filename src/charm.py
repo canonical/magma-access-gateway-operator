@@ -206,7 +206,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return
         try:
             ip = netifaces.ifaddresses("eth1")[netifaces.AF_INET][0]["addr"]
-            self._lte_core_provides.set_lte_core_information(ip)
+            self._lte_core_provides.set_lte_core_information(ip, relation_id=event.relation.id)
             self.unit.status = ActiveStatus()
         except (ValueError, AddressValueError) as e:
             logger.error(f"Failed to fetch IP address of eth1 interface: {str(e)}")
