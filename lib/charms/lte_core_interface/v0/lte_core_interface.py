@@ -83,7 +83,9 @@ class DummyLTECoreProviderCharm(CharmBase):
             return
         mme_ipv4_address = "<Here goes your code for fetching the MME IPv4 address>"
         try:
-            self.lte_core_provider.set_lte_core_information(mme_ipv4_address=mme_ipv4_address)
+            self.lte_core_provider.set_lte_core_information(
+              mme_ipv4_address=mme_ipv4_address, relation_id=event.relation.id
+            )
         except AddressValueError:
             self.unit.status = BlockedStatus("Invalid MME IPv4 address.")
 
@@ -97,7 +99,7 @@ if __name__ == "__main__":
 import logging
 from ipaddress import AddressValueError, IPv4Address
 
-from jsonschema import exceptions, validate  # type: ignore[import]
+from jsonschema import FormatChecker, exceptions, validate  # type: ignore[import]
 from ops.charm import CharmBase, CharmEvents, RelationChangedEvent
 from ops.framework import EventBase, EventSource, Handle, Object
 
@@ -109,7 +111,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 7
 
 
 logger = logging.getLogger(__name__)
@@ -178,7 +180,11 @@ class LTECoreRequires(Object):
     @staticmethod
     def _relation_data_is_valid(remote_app_relation_data: dict) -> bool:
         try:
-            validate(instance=remote_app_relation_data, schema=REQUIRER_JSON_SCHEMA)
+            validate(
+                instance=remote_app_relation_data,
+                schema=REQUIRER_JSON_SCHEMA,
+                format_checker=FormatChecker(),
+            )
             return True
         except exceptions.ValidationError:
             return False
@@ -222,22 +228,23 @@ class LTECoreProvides(Object):
         try:
             IPv4Address(mme_ipv4_address)
             return True
-        except (AddressValueError):  # noqa: E722
+        except AddressValueError:  # noqa: E722
             return False
 
-    def set_lte_core_information(self, mme_ipv4_address: str) -> None:
+    def set_lte_core_information(self, mme_ipv4_address: str, relation_id: int) -> None:
         """Sets mme_ipv4_address in the application relation data.
 
         Args:
             mme_ipv4_address: MME ipv4 address
+            relation_id: Relation ID
         Returns:
             None
         Raises:
             AddressValueError: If mme_ipv4_address is not a valid IPv4 address
         """
-        if not self.model.get_relation(self.relationship_name):
+        relation = self.model.get_relation(self.relationship_name, relation_id=relation_id)
+        if not relation:
             raise RuntimeError(f"Relation {self.relationship_name} not created yet.")
         if not self._mme_ipv4_address_is_valid(mme_ipv4_address):
             raise AddressValueError("Invalid MME IPv4 address.")
-        relation = self.model.get_relation(self.relationship_name)
-        relation.data[self.charm.app].update({"mme_ipv4_address": mme_ipv4_address})  # type: ignore[union-attr]  # noqa: E501
+        relation.data[self.charm.app].update({"mme_ipv4_address": mme_ipv4_address})
