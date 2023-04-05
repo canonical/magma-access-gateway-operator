@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import netifaces  # type: ignore[import]
+import ruamel.yaml
 from charms.lte_core_interface.v0.lte_core_interface import LTECoreProvides
 from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import (
     OrchestratorAvailableEvent,
@@ -59,6 +60,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
 
     HARDWARE_ID_LABEL = "Hardware ID"
     CHALLENGE_KEY_LABEL = "Challenge key"
+    PIPELINED_CONFIG_FILE = "/etc/magma/pipelined.yml"
 
     def __init__(self, *args):
         """Observes juju events."""
@@ -90,33 +92,36 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
 
         Args:
             event: Juju event
-
-        Returns:
-            None
         """
-        if self._is_magmad_enabled:
-            return
-        self.unit.status = MaintenanceStatus("Installing AGW Snap")
-        self.install_magma_access_gateway_snap()
-        if not self._is_configuration_valid:
-            self.unit.status = BlockedStatus("Configuration is invalid. Check logs for details")
-            return
-        self.unit.status = MaintenanceStatus("Installing AGW")
-        returncode = self.install_magma_access_gateway()
-        if returncode != 0:
-            self.unit.status = BlockedStatus("Installation script failed. See logs for details")
-            return
-        self.unit.status = MaintenanceStatus("Rebooting to apply changes")
-        self.reboot()
+        reboot_needed = False
+        if not self._is_magmad_enabled:
+            self.unit.status = MaintenanceStatus("Installing AGW Snap")
+            self.install_magma_access_gateway_snap()
+            if not self._is_configuration_valid:
+                self.unit.status = BlockedStatus(
+                    "Configuration is invalid. Check logs for details"
+                )
+                return
+            self.unit.status = MaintenanceStatus("Installing AGW")
+            returncode = self.install_magma_access_gateway()
+            if returncode != 0:
+                self.unit.status = BlockedStatus(
+                    "Installation script failed. See logs for details"
+                )
+                return
+            reboot_needed = True
+        if self._block_agw_local_ips_config != self._block_agw_local_ips_value:
+            self._set_local_agw_ips_blocking()
+            reboot_needed = True
+        if reboot_needed:
+            self.unit.status = MaintenanceStatus("Rebooting to apply changes")
+            self.reboot()
 
-    def _on_start(self, event: StartEvent):
+    def _on_start(self, event: StartEvent) -> None:
         """Triggered on start event.
 
         Args:
-            event: Juju event
-
-        Returns:
-            None
+            event: Juju event (Start event)
         """
         if not self._magma_service_is_running:
             event.defer()
@@ -128,6 +133,9 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
 
         Returns Access Gateway's Hardware ID and Challenge Key required to integrate AGW with
         the Orchestrator.
+
+        Args:
+            event: Juju event (Action Event)
         """
         if not self._magma_service_is_running:
             event.fail("Magma is not running! Please start Magma and try again.")
@@ -216,11 +224,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
 
     @staticmethod
     def install_magma_access_gateway_snap() -> None:
-        """Installs Magma Access Gateway snap.
-
-        Returns:
-            None
-        """
+        """Installs Magma Access Gateway snap."""
         subprocess.run(
             ["snap", "install", "magma-access-gateway", "--classic", "--edge"],
             stdout=subprocess.PIPE,
@@ -241,7 +245,32 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         logger.info(install_process.stdout)
         return install_process.returncode
 
-    def reboot(self) -> None:
+    def _set_local_agw_ips_blocking(self) -> None:
+        """Sets value for the `block_agw_local_ips` param in pipelined.yaml."""
+        yaml = ruamel.yaml.YAML()
+        with open(self.PIPELINED_CONFIG_FILE, "r") as pipelined_config_orig:
+            pipelined_config = yaml.load(pipelined_config_orig)
+        pipelined_config["access_control"][
+            "block_agw_local_ips"
+        ] = self._block_agw_local_ips_config
+        logger.debug(f"block_agw_local_ips set to {self._block_agw_local_ips_config}")
+        with open(self.PIPELINED_CONFIG_FILE, "w") as pipelined_config_updated:
+            yaml.dump(pipelined_config, pipelined_config_updated)
+
+    @property
+    def _block_agw_local_ips_value(self) -> bool:
+        """Gets the value of the `block_agw_local_ips` config from the pipelined.yml.
+
+        Returns:
+            bool: Value of the `block_agw_local_ips` config from the pipelined.yml
+        """
+        yaml = ruamel.yaml.YAML()
+        with open(self.PIPELINED_CONFIG_FILE, "r") as pipelined_config_orig:
+            pipelined_config = yaml.load(pipelined_config_orig)
+        return pipelined_config["access_control"]["block_agw_local_ips"]
+
+    @staticmethod
+    def reboot() -> None:
         """Sends the command to reboot the machine in 1 minute."""
         subprocess.run(
             ["shutdown", "--reboot", "+1"],
@@ -282,24 +311,31 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         """
         interface = self.model.config.get(interface_name)
         if not interface:
-            logger.warning("%s interface name is required", (interface_name))
+            logger.warning("%s interface name is required", interface_name)
             return False
         if (
             interface not in netifaces.interfaces()
             and new_interface_name not in netifaces.interfaces()  # noqa: W503
         ):
-            logger.warning("%s interface not found", (interface))
+            logger.warning("%s interface not found", interface)
             return False
         return True
 
-    def _certifier_pem_changed(self, new_cert):
+    @staticmethod
+    def _certifier_pem_changed(new_cert: str) -> bool:
+        """Returns whether the orc8r-certifier cert has changed.
+
+        Returns:
+            bool: Whether the orc8r-certifier cert has changed
+        """
         return (
             Path(CERT_CERTIFIER_CERT).exists()
             and Path(CERT_CERTIFIER_CERT).read_text() != new_cert  # noqa: W503
         )
 
     @staticmethod
-    def _remove_agw_cert_files():
+    def _remove_agw_cert_files() -> None:
+        """Removes the AGW certificates for the disk."""
         for file in [
             "/var/opt/magma/gateway.crt",
             "/var/opt/magma/gateway.key",
@@ -436,6 +472,8 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             List of arguments for install command
         """
         config = dict(self.model.config)
+        if config.pop("block-agw-local-ips"):
+            pass
         if config.pop("skip-networking"):
             return ["--no-reboot", "--skip-networking"]
         arguments = ["--no-reboot", "--dns"]
@@ -533,6 +571,17 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             ["service", "magma@magmad", "start"],
             stdout=subprocess.PIPE,
         )
+
+    @property
+    def _block_agw_local_ips_config(self) -> bool:
+        """Returns the value of the `block-agw-local-ips` Juju config.
+
+        Returns:
+            bool: The value of the `block-agw-local-ips` Juju config
+        """
+        if self.model.config.get("block-agw-local-ips"):
+            return True
+        return False
 
 
 if __name__ == "__main__":
