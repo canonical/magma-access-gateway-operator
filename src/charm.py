@@ -472,14 +472,13 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             List of arguments for install command
         """
         config = dict(self.model.config)
-        if config.pop("block-agw-local-ips"):
-            pass
         if config.pop("skip-networking"):
             return ["--no-reboot", "--skip-networking"]
         arguments = ["--no-reboot", "--dns"]
         arguments.extend(json.loads(config.pop("dns")))
         for key, value in config.items():
-            arguments.extend([f"--{key}", value])
+            if key != "block-agw-local-ips":
+                arguments.extend([f"--{key}", value])
         return arguments
 
     @property
