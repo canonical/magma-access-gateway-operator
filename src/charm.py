@@ -23,6 +23,7 @@ from charms.magma_orchestrator_interface.v0.magma_orchestrator_interface import 
 from ops.charm import (
     ActionEvent,
     CharmBase,
+    ConfigChangedEvent,
     InstallEvent,
     RelationJoinedEvent,
     StartEvent,
@@ -69,7 +70,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         self.orchestrator_requirer = OrchestratorRequires(self, "magma-orchestrator")
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.config_changed, self._on_install)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         self.framework.observe(
             self.on.get_access_gateway_secrets_action, self._on_get_access_gateway_secrets
@@ -90,43 +91,53 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def _on_install(self, event: InstallEvent) -> None:
         """Triggered on install event.
 
+        Handles deployment of the AGW.
+
         Args:
-            event: Juju event
+            event: Juju event (InstallEvent)
         """
-        reboot_needed = False
-        if not self._is_magmad_enabled:
-            self.unit.status = MaintenanceStatus("Installing AGW Snap")
-            self.install_magma_access_gateway_snap()
-            if not self._is_configuration_valid:
-                self.unit.status = BlockedStatus(
-                    "Configuration is invalid. Check logs for details"
-                )
-                return
-            self.unit.status = MaintenanceStatus("Installing AGW")
-            returncode = self.install_magma_access_gateway()
-            if returncode != 0:
-                self.unit.status = BlockedStatus(
-                    "Installation script failed. See logs for details"
-                )
-                return
-            reboot_needed = True
-        if self._block_agw_local_ips_config != self._block_agw_local_ips_value:
-            self._set_local_agw_ips_blocking()
-            reboot_needed = True
-        if reboot_needed:
-            self.unit.status = MaintenanceStatus("Rebooting to apply changes")
-            self.reboot()
+        if self._is_magmad_enabled:
+            return
+        self.unit.status = MaintenanceStatus("Installing AGW Snap")
+        self.install_magma_access_gateway_snap()
+        if not self._is_configuration_valid:
+            self.unit.status = BlockedStatus("Configuration is invalid. Check logs for details")
+            return
+        self.unit.status = MaintenanceStatus("Installing AGW")
+        returncode = self.install_magma_access_gateway()
+        if returncode != 0:
+            self.unit.status = BlockedStatus("Installation script failed. See logs for details")
+            return
+        self.unit.status = MaintenanceStatus("Rebooting to apply changes")
+        self.reboot()
 
     def _on_start(self, event: StartEvent) -> None:
         """Triggered on start event.
 
         Args:
-            event: Juju event (Start event)
+            event: Juju event (StartEvent)
         """
         if not self._magma_service_is_running:
             event.defer()
             return
         self.unit.status = ActiveStatus()
+
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        """Triggered when charm config changes.
+
+        The only config which can be changed on a running instance of Magma AGW is currently
+        the value of `block-agw-local-ips` option.
+
+        Args:
+            event: Juju event (ConfigChangedEvent)
+        """
+        if not Path(self.PIPELINED_CONFIG_FILE).exists():
+            logger.debug(f"{self.PIPELINED_CONFIG_FILE} doesn't exist yet. Deferring...")
+            event.defer()
+            return
+        if self._block_agw_local_ips_config != self._block_agw_local_ips_value:
+            self._set_local_agw_ips_blocking()
+            self.reboot()
 
     def _on_get_access_gateway_secrets(self, event: ActionEvent) -> None:
         """Triggered on get-access-gateway-secrets action call.

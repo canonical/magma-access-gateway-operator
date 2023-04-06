@@ -80,41 +80,12 @@ access_control:
                     stdout=-1,
                 ),
                 call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
             ]
         )
 
         self.assertEqual(
             self.charm.unit.status,
             MaintenanceStatus("Rebooting to apply changes"),
-        )
-
-    @patch("subprocess.run")
-    def test_given_skip_networking_config_provided_when_update_config_fails_then_status_is_blocked(  # noqa: E501
-        self, patch_subprocess_run
-    ):
-        patch_subprocess_run.side_effect = [
-            Mock(returncode=1),
-            Mock(returncode=0),
-            Mock(returncode=1),
-        ]
-        self.harness.update_config({"skip-networking": True})
-
-        patch_subprocess_run.assert_has_calls(
-            [
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
-                call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
-                ),
-                call(
-                    ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
-                    stdout=-1,
-                ),
-            ]
-        )
-        self.assertEqual(
-            self.charm.unit.status,
-            BlockedStatus("Installation script failed. See logs for details"),
         )
 
     @patch("netifaces.interfaces")
@@ -593,53 +564,6 @@ access_control:
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
-    def test_given_valid_dhcp_config_when_update_config_then_status_is_active(
-        self, _, patch_interfaces, patch_subprocess_run
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        patch_subprocess_run.side_effect = [
-            Mock(returncode=1),
-            Mock(returncode=0),
-            Mock(returncode=0),
-            Mock(returncode=0),
-            Mock(returncode=0),
-        ]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.charm._on_start(event=event)
-
-        patch_subprocess_run.assert_has_calls(
-            [
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
-                call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
-                ),
-                call(
-                    [
-                        "magma-access-gateway.install",
-                        "--no-reboot",
-                        "--dns",
-                        "8.8.8.8",
-                        "208.67.222.222",
-                        "--sgi",
-                        "enp0s1",
-                        "--s1",
-                        "enp0s2",
-                    ],
-                    stdout=-1,
-                ),
-                call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-active", "magma@magmad"], stdout=-1),
-            ]
-        )
-        self.assertEqual(
-            self.charm.unit.status,
-            ActiveStatus(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
-    @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
     def test_given_valid_static_config_when_install_then_status_is_maintenance(
         self, _, patch_interfaces, patch_subprocess_run
     ):
@@ -699,7 +623,6 @@ access_control:
                     stdout=-1,
                 ),
                 call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
             ]
         )
         self.assertEqual(
