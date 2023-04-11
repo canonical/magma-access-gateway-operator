@@ -1,11 +1,13 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import os
 import pathlib
 import tempfile
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, PropertyMock, call, mock_open, patch
 
+import ruamel.yaml
 from ops import testing
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 
@@ -15,7 +17,13 @@ testing.SIMULATE_CAN_CONNECT = True  # type: ignore[attr-defined]
 
 
 class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
+    TEST_PIPELINED_CONFIG = """# Pipeline application level configs
+access_control:
+  # Blocks access to all AGW local IPs from UEs.
+  block_agw_local_ips: true"""
+
     def setUp(self):
+        self.yaml = ruamel.yaml.YAML()
         self.harness = testing.Harness(MagmaAccessGatewayOperatorCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
@@ -46,8 +54,9 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.assertEqual("s1 interface name is required", captured.records[1].getMessage())
 
     @patch("subprocess.run")
+    @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
     def test_given_skip_networking_config_provided_when_install_then_snap_is_installed_and_status_is_maintenance(  # noqa: E501
-        self, patch_subprocess_run
+        self, _, patch_subprocess_run
     ):
         event = Mock()
         patch_subprocess_run.side_effect = [
@@ -71,7 +80,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     stdout=-1,
                 ),
                 call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
             ]
         )
 
@@ -80,38 +88,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             MaintenanceStatus("Rebooting to apply changes"),
         )
 
-    @patch("subprocess.run")
-    def test_given_skip_networking_config_provided_when_update_config_fails_then_status_is_blocked(  # noqa: E501
-        self, patch_subprocess_run
-    ):
-        patch_subprocess_run.side_effect = [
-            Mock(returncode=1),
-            Mock(returncode=0),
-            Mock(returncode=1),
-        ]
-        self.harness.update_config({"skip-networking": True})
-
-        patch_subprocess_run.assert_has_calls(
-            [
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
-                call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
-                ),
-                call(
-                    ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
-                    stdout=-1,
-                ),
-            ]
-        )
-        self.assertEqual(
-            self.charm.unit.status,
-            BlockedStatus("Installation script failed. See logs for details"),
-        )
-
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_interfaces_config_when_install_then_status_is_blocked(
-        self, patch_interfaces, patch_subprocess_run
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -126,12 +106,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
         self.assertEqual("nosuchinterface interface not found", captured.records[0].getMessage())
         self.assertEqual("bananaphone interface not found", captured.records[1].getMessage())
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv4_address_and_no_gateway_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -153,12 +131,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv4_gateway_and_no_address_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -180,12 +156,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv6_address_and_no_gateway_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -207,12 +181,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv6_gateway_and_no_address_in_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -234,12 +206,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_only_ipv6_sgi_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -262,12 +232,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_sgi_ipv4_address_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -290,12 +258,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv4_address_missing_netmask_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -318,12 +284,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_sgi_ipv4_gateway_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -346,12 +310,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_sgi_ipv6_address_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -380,12 +342,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_sgi_ipv6_address_missing_netmask_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -414,12 +374,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_sgi_ipv6_gateway_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -448,12 +406,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_only_ipv6_s1_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -475,12 +431,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_s1_ipv4_address_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -502,12 +456,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_s1_ipv6_address_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -534,12 +486,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_invalid_dns_config_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -561,12 +511,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_dns_config_not_list_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -588,12 +536,10 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
             captured.records[0].getMessage(),
         )
 
-    @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("subprocess.run")
     def test_given_dns_config_contains_non_ip_when_install_then_status_is_blocked(
-        self,
-        patch_interfaces,
-        patch_subprocess_run,
+        self, _, patch_interfaces
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -617,54 +563,9 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
 
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
-    def test_given_valid_dhcp_config_when_update_config_then_status_is_active(
-        self, patch_interfaces, patch_subprocess_run
-    ):
-        event = Mock()
-        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
-        patch_subprocess_run.side_effect = [
-            Mock(returncode=1),
-            Mock(returncode=0),
-            Mock(returncode=0),
-            Mock(returncode=0),
-            Mock(returncode=0),
-        ]
-        self.harness.update_config({"sgi": "enp0s1", "s1": "enp0s2"})
-        self.charm._on_start(event=event)
-
-        patch_subprocess_run.assert_has_calls(
-            [
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
-                call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
-                ),
-                call(
-                    [
-                        "magma-access-gateway.install",
-                        "--no-reboot",
-                        "--dns",
-                        "8.8.8.8",
-                        "208.67.222.222",
-                        "--sgi",
-                        "enp0s1",
-                        "--s1",
-                        "enp0s2",
-                    ],
-                    stdout=-1,
-                ),
-                call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-active", "magma@magmad"], stdout=-1),
-            ]
-        )
-        self.assertEqual(
-            self.charm.unit.status,
-            ActiveStatus(),
-        )
-
-    @patch("subprocess.run")
-    @patch("netifaces.interfaces")
+    @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
     def test_given_valid_static_config_when_install_then_status_is_maintenance(
-        self, patch_interfaces, patch_subprocess_run
+        self, _, patch_interfaces, patch_subprocess_run
     ):
         event = Mock()
         patch_interfaces.return_value = ["enp0s1", "enp0s2"]
@@ -722,7 +623,6 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
                     stdout=-1,
                 ),
                 call(["shutdown", "--reboot", "+1"], stdout=-1),
-                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
             ]
         )
         self.assertEqual(
@@ -733,7 +633,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_magma_service_not_running_when_start_then_status_is_unchanged(
-        self, patch_interfaces, patch_subprocess_run
+        self, _, patch_subprocess_run
     ):
         event = Mock()
         expected_status = self.charm.unit.status
@@ -758,7 +658,7 @@ class TestMagmaAccessGatewayOperatorCharm(unittest.TestCase):
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
     def test_given_magma_service_running_when_start_then_status_is_active(
-        self, patch_interfaces, patch_subprocess_run
+        self, _, patch_subprocess_run
     ):
         event = Mock()
         completed_process = Mock(returncode=0)
@@ -894,8 +794,9 @@ Challenge key
         )
 
     @patch("subprocess.run")
+    @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
     def test_given_magma_service_enabled_when_install_then_nothing_done(
-        self, patch_subprocess_run
+        self, _, patch_subprocess_run
     ):
         event = Mock()
         patch_subprocess_run.side_effect = [Mock(returncode=0)]
@@ -998,7 +899,7 @@ Challenge key
                 "rootca_cert: /var/opt/magma/tmp/certs/rootCA.pem\n"
             ),
         ]
-        self.assertTrue(all(call in mock_calls for call in expected_calls))
+        self.assertTrue(all(mock_call in mock_calls for mock_call in expected_calls))
 
         patch_subprocess_run.assert_has_calls(
             [
@@ -1109,3 +1010,25 @@ Challenge key
 
             self.assertTrue(install_file(file, "content"))
             self.assertEqual(file.read_text(), "content")
+
+    @patch(
+        "charm.MagmaAccessGatewayOperatorCharm.PIPELINED_CONFIG_FILE", new_callable=PropertyMock
+    )
+    @patch("subprocess.run")
+    def test_given_block_agw_local_ips_true_when_block_agw_local_ips_config_changed_to_false_then_block_agw_local_ips_value_updated(  # noqa: E501
+        self, patched_subprocess_run, patched_pipelined_config_file
+    ):
+        patched_subprocess_run.side_effect = [Mock(returncode=0), Mock(returncode=0)]
+        test_config = {"block-agw-local-ips": False}
+        with tempfile.TemporaryDirectory() as tempdir:
+            tmpfilepath = os.path.join(tempdir, "fake_pipelined.yml")
+            with open(tmpfilepath, "w") as fake_pipelined:
+                fake_pipelined.write(self.TEST_PIPELINED_CONFIG)
+
+            patched_pipelined_config_file.return_value = tmpfilepath
+            self.harness.update_config(test_config)
+
+            with open(tmpfilepath, "r") as fake_pipelined:
+                config = self.yaml.load(fake_pipelined)
+
+            self.assertEqual(config["access_control"]["block_agw_local_ips"], False)
