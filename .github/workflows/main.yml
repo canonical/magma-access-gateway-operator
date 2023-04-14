@@ -2,15 +2,21 @@ name: CI
 
 on:
   push:
+  schedule:
+    - cron: "0 0 * * *"
 
 jobs:
   lint-report:
     name: Lint report
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
       - name: Install tox
-        run: pip install tox
+        run: pip install tox==$TOX_VERSION
       - name: Run tests using tox
         run: tox -e lint
 
@@ -18,9 +24,13 @@ jobs:
     name: Static analysis
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
       - name: Install tox
-        run: pip install tox
+        run: pip install tox==$TOX_VERSION
       - name: Run tests using tox
         run: tox -e static
 
@@ -28,9 +38,13 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
       - name: Install tox
-        run: pip install tox
+        run: pip install tox==$TOX_VERSION
       - name: Run tests using tox
         run: tox -e unit
 
@@ -39,7 +53,13 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
+      - name: Install tox
+        run: pip install tox==$TOX_VERSION
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -58,3 +78,20 @@ jobs:
         with:
           name: juju-crashdump
           path: juju-crashdump-*.tar.xz
+
+  charmhub-upload:
+    runs-on: ubuntu-20.04
+    name: Charmhub upload
+    needs:
+      - unit-tests-with-coverage
+      - integration-test
+    if: github.ref_name == '1.8'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@2.2.2
+        with:
+          credentials: "${{ secrets.CHARMCRAFT_AUTH }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: 1.8/edge
+          charmcraft-channel: ${{ env.CHARMCRAFT_VERSION }}

@@ -42,7 +42,15 @@ access_control:
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--classic",
+                        "--channel",
+                        "1.8/stable",
+                    ],
+                    stdout=-1,
                 ),
             ]
         )
@@ -73,7 +81,15 @@ access_control:
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--classic",
+                        "--channel",
+                        "1.8/stable",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     ["magma-access-gateway.install", "--no-reboot", "--skip-networking"],
@@ -594,7 +610,15 @@ access_control:
             [
                 call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
                 call(
-                    ["snap", "install", "magma-access-gateway", "--classic", "--edge"], stdout=-1
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--classic",
+                        "--channel",
+                        "1.8/stable",
+                    ],
+                    stdout=-1,
                 ),
                 call(
                     [

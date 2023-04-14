@@ -1,4 +1,4 @@
-jsonschema
-netifaces
-ops
-ruamel.yaml
+jsonschema==4.17.3
+netifaces==0.11.0
+ops==2.2.0
+ruamel.yaml==0.17.21
