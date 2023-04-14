@@ -42,7 +42,7 @@ jobs:
             echo "promote-to=latest/stable" >> ${GITHUB_ENV}
           fi
       - name: Promote Charm
-        uses: canonical/charming-actions/release-charm@2.2.2
+        uses: canonical/charming-actions/release-charm@2.2.5
         with:
           credentials: ${{ secrets.CHARMCRAFT_AUTH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
