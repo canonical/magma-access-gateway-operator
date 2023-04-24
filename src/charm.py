@@ -237,7 +237,7 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
     def install_magma_access_gateway_snap() -> None:
         """Installs Magma Access Gateway snap."""
         subprocess.run(
-            ["snap", "install", "magma-access-gateway", "--classic", "--edge"],
+            ["snap", "install", "magma-access-gateway", "--classic", "--channel", "1.8/stable"],
             stdout=subprocess.PIPE,
         )
 

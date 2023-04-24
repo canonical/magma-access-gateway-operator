@@ -1,0 +1,51 @@
+name: Promote Charm
+
+on:
+  workflow_dispatch:
+    inputs:
+      promotion:
+        type: choice
+        description: Promotion process
+        options:
+          - 1.8/edge -> 1.8/beta
+          - 1.8/beta -> 1.8/candidate
+          - 1.8/candidate -> 1.8/stable
+          - 1.8/stable -> latest/stable
+
+jobs:
+  promote:
+    name: Promote Charm
+    runs-on: ubuntu-latest
+    if: github.ref_name == '1.8'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set Environment Variables
+        uses: tw3lveparsecs/github-actions-setvars@v0.2
+        with:
+          varFilePath: ./.github/variables/dependencies_versions.env
+      - name: Set target channel
+        env:
+          PROMOTION: ${{ github.event.inputs.promotion }}
+        run: |
+          if [ "${PROMOTION}" == "1.8/edge -> 1.8/beta" ]; then
+            echo "promote-from=1.8/edge" >> ${GITHUB_ENV}
+            echo "promote-to=1.8/beta" >> ${GITHUB_ENV}
+          elif [ "${PROMOTION}" == "1.8/beta -> 1.8/candidate" ]; then
+            echo "promote-from=1.8/beta" >> ${GITHUB_ENV}
+            echo "promote-to=1.8/candidate" >> ${GITHUB_ENV}
+          elif [ "${PROMOTION}" == "1.8/candidate -> 1.8/stable" ]; then
+            echo "promote-from=1.8/candidate" >> ${GITHUB_ENV}
+            echo "promote-to=1.8/stable" >> ${GITHUB_ENV}
+          elif [ "${PROMOTION}" == "1.8/stable -> latest/stable" ]; then
+            echo "promote-from=1.8/stable" >> ${GITHUB_ENV}
+            echo "promote-to=latest/stable" >> ${GITHUB_ENV}
+          fi
+      - name: Promote Charm
+        uses: canonical/charming-actions/release-charm@2.2.5
+        with:
+          credentials: ${{ secrets.CHARMCRAFT_AUTH }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          destination-channel: ${{ env.promote-to }}
+          origin-channel: ${{ env.promote-from }}
+          charmcraft-channel: ${{ env.CHARMCRAFT_VERSION }}
