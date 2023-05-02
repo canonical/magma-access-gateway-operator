@@ -632,6 +632,62 @@ access_control:
 
     @patch("subprocess.run")
     @patch("netifaces.interfaces")
+    @patch("charm.open", new_callable=mock_open, read_data=TEST_PIPELINED_CONFIG)
+    def test_given_block_agw_local_ips_config_is_false_when_install_then_unblock_local_ips_flag_is_added_to_the_snap_installation_command(  # noqa: E501
+        self, _, patch_interfaces, patch_subprocess_run
+    ):
+        event = Mock()
+        patch_interfaces.return_value = ["enp0s1", "enp0s2"]
+        patch_subprocess_run.side_effect = [
+            Mock(returncode=1),
+            Mock(returncode=0),
+            Mock(returncode=0),
+            Mock(returncode=0),
+            Mock(returncode=0),
+        ]
+        self.harness.update_config(
+            {
+                "sgi": "enp0s1",
+                "s1": "enp0s2",
+                "block-agw-local-ips": False,
+            }
+        )
+        patch_subprocess_run.assert_has_calls(
+            [
+                call(["systemctl", "is-enabled", "magma@magmad"], stdout=-1),
+                call(
+                    [
+                        "snap",
+                        "install",
+                        "magma-access-gateway",
+                        "--classic",
+                        "--channel",
+                        "1.8/stable",
+                    ],
+                    stdout=-1,
+                ),
+                call(
+                    [
+                        "magma-access-gateway.install",
+                        "--no-reboot",
+                        "--dns",
+                        "8.8.8.8",
+                        "208.67.222.222",
+                        "--unblock-local-ips",
+                        "--sgi",
+                        "enp0s1",
+                        "--s1",
+                        "enp0s2",
+                    ],
+                    stdout=-1,
+                ),
+                call(["shutdown", "--reboot", "+1"], stdout=-1),
+            ]
+        )
+        self.charm._on_install(event=event)
+
+    @patch("subprocess.run")
+    @patch("netifaces.interfaces")
     def test_given_magma_service_not_running_when_start_then_status_is_unchanged(
         self, _, patch_subprocess_run
     ):
