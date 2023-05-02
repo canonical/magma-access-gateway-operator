@@ -11,7 +11,7 @@ import re
 import subprocess
 from ipaddress import AddressValueError
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import netifaces  # type: ignore[import]
 import ruamel.yaml
@@ -88,13 +88,13 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             self.on["lte-core"].relation_joined, self._on_lte_core_relation_joined
         )
 
-    def _on_install(self, event: InstallEvent) -> None:
+    def _on_install(self, event: Union[ConfigChangedEvent, InstallEvent]) -> None:
         """Triggered on install event.
 
         Handles deployment of the AGW.
 
         Args:
-            event: Juju event (InstallEvent)
+            event: Juju event (ConfigChangedEvent or InstallEvent)
         """
         if self._is_magmad_enabled:
             return
@@ -131,12 +131,14 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
         Args:
             event: Juju event (ConfigChangedEvent)
         """
+        self._on_install(event)
         if not Path(self.PIPELINED_CONFIG_FILE).exists():
             logger.debug(f"{self.PIPELINED_CONFIG_FILE} doesn't exist yet. Deferring...")
             event.defer()
             return
         if self._block_agw_local_ips_config != self._block_agw_local_ips_value:
             self._set_local_agw_ips_blocking()
+            self.unit.status = MaintenanceStatus("Rebooting to apply changes")
             self.reboot()
 
     def _on_get_access_gateway_secrets(self, event: ActionEvent) -> None:
@@ -487,9 +489,10 @@ class MagmaAccessGatewayOperatorCharm(CharmBase):
             return ["--no-reboot", "--skip-networking"]
         arguments = ["--no-reboot", "--dns"]
         arguments.extend(json.loads(config.pop("dns")))
+        if not config.pop("block-agw-local-ips"):
+            arguments.extend(["--unblock-local-ips"])
         for key, value in config.items():
-            if key != "block-agw-local-ips":
-                arguments.extend([f"--{key}", value])
+            arguments.extend([f"--{key}", value])
         return arguments
 
     @property
